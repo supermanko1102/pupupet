@@ -1,0 +1,13 @@
+# macOS
+.DS_Store
+
+# Local Env
+.env*.local
+
+# App folder patterns (already in app/.gitignore but safe to have here)
+node_modules/
+.expo/
+dist/
+web-build/
+ios/
+android/
