@@ -17,6 +17,8 @@ $$;
 
 create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
+  display_name text,
+  avatar_url text,
   created_at timestamptz not null default timezone('utc', now())
 );
 
@@ -25,6 +27,9 @@ create table if not exists public.pets (
   user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
   name text not null check (char_length(trim(name)) between 1 and 50),
   species text not null default 'dog' check (species in ('dog', 'cat', 'other')),
+  breed text,
+  birthday date,
+  weight_kg numeric(4,1),
   notes text,
   created_at timestamptz not null default timezone('utc', now())
 );
@@ -44,6 +49,7 @@ create table if not exists public.poop_logs (
   recommendation text,
   model_version text,
   confidence numeric(4,3) check (confidence between 0 and 1),
+  ai_raw_json jsonb,
   created_at timestamptz not null default timezone('utc', now())
 );
 

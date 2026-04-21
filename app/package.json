@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "scripts": {
     "dev": "expo start",
+    "ios": "expo run:ios",
     "start": "expo start",
     "web": "expo start --web",
     "lint": "expo lint",
@@ -28,6 +29,7 @@
     "expo-haptics": "~55.0.14",
     "expo-image": "~55.0.8",
     "expo-image-picker": "~55.0.18",
+    "expo-linear-gradient": "^55.0.13",
     "expo-linking": "~55.0.13",
     "expo-router": "~55.0.12",
     "expo-splash-screen": "~55.0.18",

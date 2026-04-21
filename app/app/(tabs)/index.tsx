@@ -12,12 +12,10 @@ import {
   View,
 } from 'react-native';
 
-import { AppleSignInCard } from '@/components/apple-sign-in-card';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Fonts } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { getSupabaseConfigDiagnostics } from '@/lib/env';
 import { uploadPoopPhoto } from '@/lib/uploads';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/providers/session-provider';
@@ -39,19 +37,16 @@ type RecentLog = {
 
 export default function LogScreen() {
   const colorScheme = useColorScheme() ?? 'light';
-  const { authError, debugLog, isReady, user } = useSession();
+  const { authError, isReady, user } = useSession();
   const palette = Colors[colorScheme];
-  const diagnostics = getSupabaseConfigDiagnostics();
 
   const [pets, setPets] = useState<Pet[]>([]);
   const [selectedPetId, setSelectedPetId] = useState<string | null>(null);
   const [recentLogs, setRecentLogs] = useState<RecentLog[]>([]);
-  const [petName, setPetName] = useState('Pupu');
   const [selectedAsset, setSelectedAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [summary, setSummary] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isSavingPet, setIsSavingPet] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [banner, setBanner] = useState<string | null>(null);
 
@@ -140,41 +135,34 @@ export default function LogScreen() {
     void loadDashboard();
   }, [isReady, loadDashboard, user, user?.id]);
 
-  async function createPet() {
+  async function ensureDefaultPet() {
     if (!supabase) {
-      return;
+      throw new Error('Supabase 尚未設定完成。');
     }
 
-    const name = petName.trim();
+    const existingPetId = selectedPetId ?? pets[0]?.id;
 
-    if (!name) {
-      Alert.alert('請先輸入寵物名稱');
-      return;
+    if (existingPetId) {
+      return existingPetId;
     }
-
-    setIsSavingPet(true);
-    setBanner(null);
 
     const { data, error } = await supabase
       .from('pets')
       .insert({
-        name,
+        name: '我的毛孩',
         species: 'dog',
       })
       .select()
       .single();
 
-    setIsSavingPet(false);
-
     if (error) {
-      setBanner(error.message);
-      return;
+      throw error;
     }
 
     setPets((current) => [data, ...current]);
     setSelectedPetId(data.id);
-    setPetName('');
-    setBanner(`已建立寵物：${data.name}`);
+
+    return data.id;
   }
 
   async function choosePhoto() {
@@ -205,11 +193,6 @@ export default function LogScreen() {
       return;
     }
 
-    if (!selectedPetId) {
-      Alert.alert('先建立寵物', '至少先建立一隻寵物，才能綁定便便紀錄。');
-      return;
-    }
-
     if (!selectedAsset) {
       Alert.alert('先選照片', '先從相簿挑一張照片，再上傳。');
       return;
@@ -219,9 +202,10 @@ export default function LogScreen() {
     setBanner(null);
 
     try {
+      const petId = await ensureDefaultPet();
       const imagePath = await uploadPoopPhoto(user.id, selectedAsset);
       const { error } = await supabase.from('poop_logs').insert({
-        pet_id: selectedPetId,
+        pet_id: petId,
         image_path: imagePath,
         status: 'uploaded',
         summary: summary.trim() || '等待 AI 分析',
@@ -240,10 +224,6 @@ export default function LogScreen() {
     } finally {
       setIsUploading(false);
     }
-  }
-
-  function selectedPetName() {
-    return pets.find((pet) => pet.id === selectedPetId)?.name ?? '尚未選擇';
   }
 
   return (
@@ -270,96 +250,19 @@ export default function LogScreen() {
         </ThemedText>
       </ThemedView>
 
-      {!user ? <AppleSignInCard /> : null}
-
-      <ThemedView style={styles.card}>
-        <ThemedText type="subtitle">連線狀態</ThemedText>
-        {!isReady ? (
-          <ActivityIndicator style={styles.loader} color={palette.tint} />
-        ) : (
-          <View style={styles.statusStack}>
-            <StatusPill
-              label={authError ? '設定錯誤' : user ? '已登入' : '待登入'}
-              tone={authError ? 'danger' : user ? 'success' : 'warning'}
-            />
-            <ThemedText style={styles.helperText}>
-              {authError ?? (user ? `Apple 使用者：${user.id}` : '請先用 Apple 登入')}
-            </ThemedText>
-          </View>
-        )}
-        {banner ? <ThemedText style={[styles.banner, { color: '#8A3B12' }]}>{banner}</ThemedText> : null}
-      </ThemedView>
-
-      <ThemedView style={styles.card}>
-        <ThemedText type="subtitle">Debug Log</ThemedText>
-        <ThemedText style={styles.helperText}>
-          這裡顯示目前這個 build 實際讀到的 Supabase 設定與 auth 狀態。
-        </ThemedText>
-        <View style={styles.debugBlock}>
-          <DebugRow label="supabase client" value={supabase ? 'ready' : 'missing'} />
-          <DebugRow
-            label="EXPO_PUBLIC_SUPABASE_URL"
-            value={diagnostics.urlPresent ? diagnostics.urlPreview : '(missing)'}
-          />
-          <DebugRow
-            label="EXPO_PUBLIC_SUPABASE_ANON_KEY"
-            value={diagnostics.anonKeyPresent ? diagnostics.anonKeyPreview : '(missing)'}
-          />
-          <DebugRow label="auth user" value={user?.id ?? '(none)'} />
-          {debugLog.map((line) => (
-            <DebugRow key={line} label="state" value={line} />
-          ))}
-        </View>
-      </ThemedView>
-
-      {user ? (
+      {banner ? (
         <ThemedView style={styles.card}>
-          <ThemedText type="subtitle">1. 建立寵物</ThemedText>
-          <TextInput
-            value={petName}
-            onChangeText={setPetName}
-            placeholder="例如：Pupu"
-            placeholderTextColor="#8B8478"
-            style={styles.input}
-          />
-          <Pressable
-            style={[styles.button, styles.primaryButton, isSavingPet && styles.buttonDisabled]}
-            onPress={() => void createPet()}
-            disabled={isSavingPet || !isReady || Boolean(authError)}>
-            <ThemedText style={styles.primaryButtonText}>
-              {isSavingPet ? '建立中...' : '新增寵物'}
-            </ThemedText>
-          </Pressable>
-          {pets.length > 0 ? (
-            <View style={styles.petChipRow}>
-              {pets.map((pet) => {
-                const isActive = pet.id === selectedPetId;
-
-                return (
-                  <Pressable
-                    key={pet.id}
-                    style={[
-                      styles.chip,
-                      isActive && { backgroundColor: '#1D6B57', borderColor: '#1D6B57' },
-                    ]}
-                    onPress={() => setSelectedPetId(pet.id)}>
-                    <ThemedText style={[styles.chipText, isActive && { color: '#FFF7F0' }]}>
-                      {pet.name}
-                    </ThemedText>
-                  </Pressable>
-                );
-              })}
-            </View>
-          ) : (
-            <ThemedText style={styles.helperText}>還沒有寵物資料，先建立一隻。</ThemedText>
-          )}
+          <ThemedText type="subtitle">狀態</ThemedText>
+          <ThemedText style={[styles.banner, { color: '#8A3B12' }]}>{banner}</ThemedText>
         </ThemedView>
       ) : null}
 
       {user ? (
         <ThemedView style={styles.card}>
-          <ThemedText type="subtitle">2. 上傳便便照片</ThemedText>
-          <ThemedText style={styles.helperText}>目前綁定寵物：{selectedPetName()}</ThemedText>
+          <ThemedText type="subtitle">上傳便便照片</ThemedText>
+          <ThemedText style={styles.helperText}>
+            不用先建立寵物。第一次上傳時系統會自動補一筆預設資料，先把拍照記錄流程走通。
+          </ThemedText>
 
           <Pressable
             style={[styles.button, styles.secondaryButton]}
@@ -432,15 +335,6 @@ export default function LogScreen() {
         </ThemedView>
       ) : null}
     </ScrollView>
-  );
-}
-
-function DebugRow({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.debugRow}>
-      <ThemedText style={styles.debugLabel}>{label}</ThemedText>
-      <ThemedText style={styles.debugValue}>{value}</ThemedText>
-    </View>
   );
 }
 
@@ -539,29 +433,6 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
     paddingTop: 20,
   },
-  debugBlock: {
-    backgroundColor: '#FBF8F2',
-    borderRadius: 20,
-    gap: 10,
-    padding: 14,
-  },
-  debugLabel: {
-    color: '#6C655C',
-    fontFamily: Fonts.mono,
-    fontSize: 12,
-    width: 160,
-  },
-  debugRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  debugValue: {
-    color: '#2C241C',
-    flex: 1,
-    fontFamily: Fonts.mono,
-    fontSize: 13,
-    lineHeight: 18,
-  },
   eyebrow: {
     fontSize: 13,
     fontWeight: '700',
@@ -598,9 +469,6 @@ const styles = StyleSheet.create({
     minHeight: 54,
     paddingHorizontal: 16,
     paddingVertical: 14,
-  },
-  loader: {
-    marginTop: 12,
   },
   logCard: {
     backgroundColor: '#FBF8F2',
@@ -667,10 +535,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-  },
-  statusStack: {
-    gap: 10,
-    marginTop: 8,
   },
   textArea: {
     minHeight: 112,
