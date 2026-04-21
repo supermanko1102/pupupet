@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Pawsitive Teal - Home</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-family: 'Material Symbols Outlined';
+            font-weight: normal;
+            font-style: normal;
+            font-size: 24px;
+            line-height: 1;
+            letter-spacing: normal;
+            text-transform: none;
+            display: inline-block;
+            white-space: nowrap;
+            word-wrap: normal;
+            direction: ltr;
+            -webkit-font-feature-settings: 'liga';
+            -webkit-font-smoothing: antialiased;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary-fixed-dim": "#a2cfca",
+                        "on-tertiary-fixed-variant": "#79300b",
+                        "tertiary": "#984721",
+                        "on-background": "#171d1c",
+                        "primary-container": "#20b2aa",
+                        "on-error": "#ffffff",
+                        "error": "#ba1a1a",
+                        "secondary-container": "#bbe9e4",
+                        "primary-fixed": "#79f6ed",
+                        "surface-dim": "#d5dbda",
+                        "surface-bright": "#f5fbf9",
+                        "tertiary-fixed-dim": "#ffb597",
+                        "on-primary-container": "#003e3b",
+                        "outline": "#6c7a78",
+                        "on-error-container": "#93000a",
+                        "error-container": "#ffdad6",
+                        "outline-variant": "#bbc9c7",
+                        "tertiary-fixed": "#ffdbcd",
+                        "surface-container-low": "#eff5f3",
+                        "inverse-on-surface": "#ecf2f0",
+                        "surface-container-high": "#e3e9e8",
+                        "primary": "#006a65",
+                        "on-tertiary-fixed": "#360f00",
+                        "inverse-surface": "#2b3231",
+                        "surface-container-lowest": "#ffffff",
+                        "on-secondary-fixed-variant": "#224e4a",
+                        "primary-fixed-dim": "#59dad1",
+                        "on-primary": "#ffffff",
+                        "on-surface": "#171d1c",
+                        "on-tertiary-container": "#632200",
+                        "on-primary-fixed-variant": "#00504c",
+                        "on-secondary-container": "#3f6a66",
+                        "on-secondary": "#ffffff",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary-fixed": "#00201e",
+                        "surface": "#f5fbf9",
+                        "secondary": "#3b6662",
+                        "surface-variant": "#dee4e2",
+                        "secondary-fixed": "#beebe7",
+                        "surface-container-highest": "#dee4e2",
+                        "surface-container": "#e9efed",
+                        "surface-tint": "#006a65",
+                        "inverse-primary": "#59dad1",
+                        "tertiary-container": "#e9865b",
+                        "on-primary-fixed": "#00201e",
+                        "background": "#ffffff",
+                        "on-surface-variant": "#3c4948"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {},
+                    "fontFamily": {
+                        "headline": ["Plus Jakarta Sans"],
+                        "body": ["Plus Jakarta Sans"],
+                        "label": ["Plus Jakarta Sans"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-white dark:bg-[#171d1c] text-on-background font-body min-h-screen flex flex-col">
+<!-- TopAppBar -->
+<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-white dark:bg-[#171d1c] docked full-width top-0">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-surface-container-highest overflow-hidden">
+<img alt="Pet Profile" class="w-full h-full object-cover" data-alt="A close-up portrait of a friendly golden retriever dog looking directly at the camera with soft, warm lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC8EMj0YzwxMJS2GfaKXNU2F-vTzaggppPwwPqxHzm_CAdAFK6xC6Ng9Ro4hmSlwebD9dtpkYvBUddwHJLH5pCE8nkQvhvZM6WSBQf2sTTo25nfPcpTWeU3wNZffG6mbSuanoL-2Lx9GOOiF-uGUk12J7SMm77eiSFk8Mb6KEIPiAD292puFZYsRcNCHym-A-MWP7fHd4ZzdPP6S3KuW8RuGVpnOk1qDyt4STA1BcwnrXnR6kn1I1Lv8ICVqxJsla-CybV0AqzHwXVA"/>
+</div>
+<span class="font-['Plus_Jakarta_Sans'] font-bold tracking-tight text-xl text-primary dark:text-[#20b2aa]">Pawsitive Teal</span>
+</div>
+<button class="w-10 h-10 flex items-center justify-center rounded-full text-primary dark:text-[#20b2aa] hover:bg-gray-50 dark:hover:bg-white/5 transition-colors Active: opacity-80 scale-95 duration-200">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-grow pt-24 pb-32 px-6 flex flex-col items-center justify-center">
+<div class="flex flex-col items-center justify-center space-y-20 w-full max-w-md mx-auto">
+<!-- Welcome Message & Illustration -->
+<div class="text-center space-y-4">
+<h1 class="font-headline text-3xl font-bold text-on-surface">Ready for a health check?</h1>
+<p class="font-body text-lg text-on-surface-variant">Ensure your companion is feeling their best today.</p>
+</div>
+<!-- Primary Action Button -->
+<div class="pt-8">
+<button class="relative group w-56 h-56 rounded-full bg-[#20b2aa] text-white flex flex-col items-center justify-center shadow-md hover:scale-[1.02] transition-transform duration-300 ease-out">
+<div class="absolute inset-0 rounded-full bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+<span class="material-symbols-outlined text-6xl mb-3" data-icon="photo_camera" style="font-variation-settings: 'FILL' 1;">photo_camera</span>
+<span class="font-headline text-xl font-bold tracking-wide">Start Scan</span>
+</button>
+</div>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3 bg-white dark:bg-[#171d1c] border-t border-gray-100 dark:border-gray-800 docked full-width bottom-0">
+<button class="flex flex-col items-center justify-center text-[#20b2aa] rounded-xl px-4 py-1.5 transition-all Active: scale-90 duration-300 ease-spring">
+<span class="material-symbols-outlined mb-1" data-icon="document_scanner" data-weight="fill" style="font-variation-settings: 'FILL' 1;">document_scanner</span>
+<span class="font-['Plus_Jakarta_Sans'] text-[10px] font-semibold uppercase tracking-wider">Scan</span>
+</button>
+<button class="flex flex-col items-center justify-center text-gray-400 dark:text-gray-500 px-4 py-1.5 hover:text-gray-600 dark:hover:text-gray-300 transition-all Active: scale-90 duration-300 ease-spring">
+<span class="material-symbols-outlined mb-1" data-icon="history">history</span>
+<span class="font-['Plus_Jakarta_Sans'] text-[10px] font-semibold uppercase tracking-wider">History</span>
+</button>
+<button class="flex flex-col items-center justify-center text-gray-400 dark:text-gray-500 px-4 py-1.5 hover:text-gray-600 dark:hover:text-gray-300 transition-all Active: scale-90 duration-300 ease-spring">
+<span class="material-symbols-outlined mb-1" data-icon="monitoring">monitoring</span>
+<span class="font-['Plus_Jakarta_Sans'] text-[10px] font-semibold uppercase tracking-wider">Trends</span>
+</button>
+<button class="flex flex-col items-center justify-center text-gray-400 dark:text-gray-500 px-4 py-1.5 hover:text-gray-600 dark:hover:text-gray-300 transition-all Active: scale-90 duration-300 ease-spring">
+<span class="material-symbols-outlined mb-1" data-icon="folder_special">folder_special</span>
+<span class="font-['Plus_Jakarta_Sans'] text-[10px] font-semibold uppercase tracking-wider">Collection</span>
+</button>
+<button class="flex flex-col items-center justify-center text-gray-400 dark:text-gray-500 px-4 py-1.5 hover:text-gray-600 dark:hover:text-gray-300 transition-all Active: scale-90 duration-300 ease-spring">
+<span class="material-symbols-outlined mb-1" data-icon="vital_signs">vital_signs</span>
+<span class="font-['Plus_Jakarta_Sans'] text-[10px] font-semibold uppercase tracking-wider">Evolution</span>
+</button>
+</nav>
+</body></html>

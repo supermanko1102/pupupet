@@ -1,20 +1,22 @@
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
-import { useCallback, useEffect, useState } from 'react';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
-  TextInput,
+  Text,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Colors, Fonts } from '@/constants/theme';
+import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { uploadPoopPhoto } from '@/lib/uploads';
 import { supabase } from '@/lib/supabase';
@@ -35,26 +37,31 @@ type RecentLog = {
   summary: string | null;
 };
 
-export default function LogScreen() {
+export default function HomeScreen() {
   const colorScheme = useColorScheme() ?? 'light';
-  const { authError, isReady, user } = useSession();
+  const { isReady, user } = useSession();
   const palette = Colors[colorScheme];
 
   const [pets, setPets] = useState<Pet[]>([]);
   const [selectedPetId, setSelectedPetId] = useState<string | null>(null);
   const [recentLogs, setRecentLogs] = useState<RecentLog[]>([]);
-  const [selectedAsset, setSelectedAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
-  const [summary, setSummary] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [banner, setBanner] = useState<string | null>(null);
+  const [capturedAsset, setCapturedAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [modalPhase, setModalPhase] = useState<'preview' | 'analyzing' | 'result'>('preview');
+  const [analysisResult, setAnalysisResult] = useState<{
+    imageUrl: string;
+    bristolScore: number | null;
+    riskLevel: RiskLevel;
+    summary: string | null;
+    recommendation: string | null;
+  } | null>(null);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadDashboard = useCallback(
     async (isPullToRefresh = false) => {
-      if (!supabase || !user) {
-        return;
-      }
+      if (!supabase || !user) return;
 
       const client = supabase;
 
@@ -64,35 +71,19 @@ export default function LogScreen() {
         setIsLoading(true);
       }
 
-      setBanner(null);
-
-      const [{ data: petsData, error: petsError }, { data: logRows, error: logsError }] =
-        await Promise.all([
-          client.from('pets').select('*').order('created_at', { ascending: false }),
-          client
-            .from('poop_logs')
-            .select(
-              'id, captured_at, image_path, status, summary, risk_level, bristol_score, pets(name)'
-            )
-            .order('captured_at', { ascending: false })
-            .limit(8),
-        ]);
-
-      if (petsError || logsError) {
-        setBanner(petsError?.message ?? logsError?.message ?? '讀取資料失敗。');
-        setIsLoading(false);
-        setIsRefreshing(false);
-        return;
-      }
+      const [{ data: petsData }, { data: logRows }] = await Promise.all([
+        client.from('pets').select('*').order('created_at', { ascending: false }),
+        client
+          .from('poop_logs')
+          .select('id, captured_at, image_path, status, summary, risk_level, bristol_score, pets(name)')
+          .order('captured_at', { ascending: false })
+          .limit(8),
+      ]);
 
       const nextPets = petsData ?? [];
       setPets(nextPets);
-
       setSelectedPetId((current) => {
-        if (current && nextPets.some((pet) => pet.id === current)) {
-          return current;
-        }
-
+        if (current && nextPets.some((p) => p.id === current)) return current;
         return nextPets[0]?.id ?? null;
       });
 
@@ -102,11 +93,9 @@ export default function LogScreen() {
             row.pets && typeof row.pets === 'object' && 'name' in row.pets
               ? row.pets.name
               : '未命名寵物';
-
           const { data } = await client.storage
             .from('poop-photos')
             .createSignedUrl(row.image_path, 60 * 60);
-
           return {
             bristolScore: row.bristol_score,
             capturedAt: row.captured_at,
@@ -128,416 +117,686 @@ export default function LogScreen() {
   );
 
   useEffect(() => {
-    if (!isReady || !user || !supabase) {
-      return;
-    }
-
+    if (!isReady || !user || !supabase) return;
     void loadDashboard();
-  }, [isReady, loadDashboard, user, user?.id]);
+  }, [isReady, loadDashboard, user]);
 
   async function ensureDefaultPet() {
-    if (!supabase) {
-      throw new Error('Supabase 尚未設定完成。');
-    }
-
+    if (!supabase) throw new Error('Supabase 尚未設定完成。');
     const existingPetId = selectedPetId ?? pets[0]?.id;
-
-    if (existingPetId) {
-      return existingPetId;
-    }
+    if (existingPetId) return existingPetId;
 
     const { data, error } = await supabase
       .from('pets')
-      .insert({
-        name: '我的毛孩',
-        species: 'dog',
-      })
+      .insert({ name: '我的毛孩', species: 'dog' })
       .select()
       .single();
 
-    if (error) {
-      throw error;
-    }
-
+    if (error) throw error;
     setPets((current) => [data, ...current]);
     setSelectedPetId(data.id);
-
     return data.id;
   }
 
-  async function choosePhoto() {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
+  async function startScan() {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert('需要相簿權限', '請先允許 App 存取相簿，才能上傳便便照片。');
+      Alert.alert('需要相機權限', '請先允許 App 使用相機。');
       return;
     }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
+    const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ['images'],
       quality: 0.85,
       allowsEditing: true,
       aspect: [4, 3],
     });
 
-    if (result.canceled) {
-      return;
-    }
-
-    setSelectedAsset(result.assets[0] ?? null);
-    setBanner(null);
+    if (result.canceled || !result.assets[0]) return;
+    setCapturedAsset(result.assets[0]);
   }
 
-  async function uploadLog() {
-    if (!supabase || !user) {
-      return;
-    }
-
-    if (!selectedAsset) {
-      Alert.alert('先選照片', '先從相簿挑一張照片，再上傳。');
-      return;
-    }
+  async function confirmUpload() {
+    if (!capturedAsset || !supabase || !user) return;
 
     setIsUploading(true);
-    setBanner(null);
-
     try {
       const petId = await ensureDefaultPet();
-      const imagePath = await uploadPoopPhoto(user.id, selectedAsset);
-      const { error } = await supabase.from('poop_logs').insert({
-        pet_id: petId,
-        image_path: imagePath,
-        status: 'uploaded',
-        summary: summary.trim() || '等待 AI 分析',
-      });
+      const imagePath = await uploadPoopPhoto(user.id, capturedAsset);
+      const { data: newLog, error } = await supabase
+        .from('poop_logs')
+        .insert({ pet_id: petId, image_path: imagePath, status: 'uploaded' })
+        .select('id, image_path')
+        .single();
+      if (error) throw error;
 
-      if (error) {
-        throw error;
-      }
-
-      setSelectedAsset(null);
-      setSummary('');
-      setBanner('照片已上傳，資料已寫入 Supabase。');
-      await loadDashboard();
-    } catch (error) {
-      setBanner(error instanceof Error ? error.message : '上傳失敗。');
+      setModalPhase('analyzing');
+      startPolling(newLog.id, newLog.image_path);
+    } catch (err) {
+      Alert.alert('上傳失敗', err instanceof Error ? err.message : '請稍後再試。');
     } finally {
       setIsUploading(false);
     }
   }
 
+  function startPolling(logId: string, imagePath: string) {
+    if (pollingRef.current) clearInterval(pollingRef.current);
+
+    pollingRef.current = setInterval(async () => {
+      if (!supabase) return;
+
+      const { data } = await supabase
+        .from('poop_logs')
+        .select('status, bristol_score, risk_level, summary, recommendation')
+        .eq('id', logId)
+        .single();
+
+      if (data?.status === 'done' || data?.status === 'failed') {
+        clearInterval(pollingRef.current!);
+        pollingRef.current = null;
+
+        const { data: signedData } = await supabase.storage
+          .from('poop-photos')
+          .createSignedUrl(imagePath, 60 * 60);
+
+        setAnalysisResult({
+          imageUrl: signedData?.signedUrl ?? '',
+          bristolScore: data.bristol_score,
+          riskLevel: data.risk_level,
+          summary: data.summary,
+          recommendation: data.recommendation,
+        });
+        setModalPhase('result');
+        void loadDashboard();
+      }
+    }, 2000);
+  }
+
+  function closeModal() {
+    if (pollingRef.current) clearInterval(pollingRef.current);
+    pollingRef.current = null;
+    setCapturedAsset(null);
+    setModalPhase('preview');
+    setAnalysisResult(null);
+  }
+
   return (
-    <ScrollView
-      contentContainerStyle={[
-        styles.container,
-        { backgroundColor: colorScheme === 'dark' ? '#111317' : '#F7F1E8' },
-      ]}
-      refreshControl={
-        <RefreshControl
-          refreshing={isRefreshing}
-          onRefresh={() => (user ? void loadDashboard(true) : undefined)}
-        />
-      }>
-      <ThemedView style={[styles.hero, { backgroundColor: colorScheme === 'dark' ? '#1E2430' : '#F2D6B3' }]}>
-        <ThemedText style={[styles.eyebrow, { color: colorScheme === 'dark' ? '#F4C27B' : '#7A3B00' }]}>
-          PupuPet MVP
-        </ThemedText>
-        <ThemedText type="title" style={[styles.heroTitle, { fontFamily: Fonts.rounded }]}>
-          先用 Apple 登入，再留下第一筆便便紀錄
-        </ThemedText>
-        <ThemedText style={styles.heroBody}>
-          這一版已經接上 Supabase Auth、Storage 與 Postgres。先把登入和資料流走通，再接 AI 分析。
-        </ThemedText>
-      </ThemedView>
+    <>
+    {/* 拍照 / 分析 / 結果 Modal */}
+    <Modal visible={!!capturedAsset} animationType="slide" presentationStyle="pageSheet">
+      <SafeAreaView style={styles.modalSafe}>
 
-      {banner ? (
-        <ThemedView style={styles.card}>
-          <ThemedText type="subtitle">狀態</ThemedText>
-          <ThemedText style={[styles.banner, { color: '#8A3B12' }]}>{banner}</ThemedText>
-        </ThemedView>
-      ) : null}
+        {/* 階段一：預覽確認 */}
+        {modalPhase === 'preview' && (
+          <>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>確認上傳</Text>
+            </View>
+            {capturedAsset && (
+              <Image source={{ uri: capturedAsset.uri }} style={styles.modalPreview} contentFit="cover" />
+            )}
+            <View style={styles.modalActions}>
+              <Pressable
+                style={[styles.modalButton, styles.uploadButton, isUploading && { opacity: 0.6 }]}
+                onPress={() => void confirmUpload()}
+                disabled={isUploading}>
+                {isUploading
+                  ? <ActivityIndicator color="#ffffff" />
+                  : <Text style={styles.uploadButtonText}>上傳分析</Text>}
+              </Pressable>
+              <Pressable
+                style={[styles.modalButton, styles.retakeButton]}
+                onPress={closeModal}
+                disabled={isUploading}>
+                <Text style={styles.retakeButtonText}>重拍</Text>
+              </Pressable>
+            </View>
+          </>
+        )}
 
-      {user ? (
-        <ThemedView style={styles.card}>
-          <ThemedText type="subtitle">上傳便便照片</ThemedText>
-          <ThemedText style={styles.helperText}>
-            不用先建立寵物。第一次上傳時系統會自動補一筆預設資料，先把拍照記錄流程走通。
-          </ThemedText>
-
-          <Pressable
-            style={[styles.button, styles.secondaryButton]}
-            onPress={() => void choosePhoto()}
-            disabled={!isReady || Boolean(authError)}>
-            <ThemedText style={styles.secondaryButtonText}>
-              {selectedAsset ? '重新選擇照片' : '從相簿選照片'}
-            </ThemedText>
-          </Pressable>
-
-          {selectedAsset ? (
-            <Image source={{ uri: selectedAsset.uri }} style={styles.preview} contentFit="cover" />
-          ) : null}
-
-          <TextInput
-            value={summary}
-            onChangeText={setSummary}
-            placeholder="先寫一句觀察，例如：今天偏軟、顏色較深"
-            placeholderTextColor="#8B8478"
-            multiline
-            style={[styles.input, styles.textArea]}
-          />
-
-          <Pressable
-            style={[styles.button, styles.primaryButton, isUploading && styles.buttonDisabled]}
-            onPress={() => void uploadLog()}
-            disabled={isUploading || !selectedAsset || Boolean(authError)}>
-            <ThemedText style={styles.primaryButtonText}>
-              {isUploading ? '上傳中...' : '寫入 Supabase'}
-            </ThemedText>
-          </Pressable>
-        </ThemedView>
-      ) : null}
-
-      {user ? (
-        <ThemedView style={styles.card}>
-          <View style={styles.sectionHeader}>
-            <ThemedText type="subtitle">最近紀錄</ThemedText>
-            {isLoading ? <ActivityIndicator color={palette.tint} /> : null}
+        {/* 階段二：分析中 */}
+        {modalPhase === 'analyzing' && (
+          <View style={styles.analyzingContainer}>
+            {capturedAsset && (
+              <Image source={{ uri: capturedAsset.uri }} style={styles.analyzingImage} contentFit="cover" />
+            )}
+            <View style={styles.analyzingOverlay}>
+              <ActivityIndicator size="large" color="#20B2AA" />
+              <Text style={styles.analyzingTitle}>AI 分析中...</Text>
+              <Text style={styles.analyzingSubtitle}>正在分析健康狀況，請稍候</Text>
+            </View>
           </View>
+        )}
 
-          {recentLogs.length === 0 ? (
-            <ThemedText style={styles.helperText}>目前還沒有紀錄，先上傳一張照片測試。</ThemedText>
-          ) : (
-            recentLogs.map((log) => (
-              <View key={log.id} style={styles.logCard}>
-                {log.imageUrl ? (
-                  <Image source={{ uri: log.imageUrl }} style={styles.logImage} contentFit="cover" />
-                ) : (
-                  <View style={[styles.logImage, styles.logImageFallback]}>
-                    <ThemedText style={styles.helperText}>無預覽</ThemedText>
-                  </View>
-                )}
-                <View style={styles.logMeta}>
-                  <View style={styles.logRow}>
-                    <ThemedText type="defaultSemiBold">{log.petName}</ThemedText>
-                    <StatusPill label={riskLabel(log.riskLevel, log.status)} tone={riskTone(log.riskLevel)} />
-                  </View>
-                  <ThemedText style={styles.helperText}>
-                    {new Date(log.capturedAt).toLocaleString()}
-                  </ThemedText>
-                  <ThemedText numberOfLines={2}>{log.summary ?? '等待分析結果'}</ThemedText>
-                  <ThemedText style={styles.helperText}>
-                    Bristol：{log.bristolScore ? String(log.bristolScore) : '尚未分析'}
-                  </ThemedText>
+        {/* 階段三：分析結果 */}
+        {modalPhase === 'result' && analysisResult && (
+          <ScrollView style={styles.resultScroll} contentContainerStyle={styles.resultContent}>
+            {analysisResult.imageUrl ? (
+              <Image source={{ uri: analysisResult.imageUrl }} style={styles.resultImage} contentFit="cover" />
+            ) : null}
+
+            <View style={styles.resultBody}>
+              {/* 風險等級 */}
+              <View style={[styles.riskBanner, riskBannerStyle(analysisResult.riskLevel)]}>
+                <Text style={[styles.riskBannerIcon]}>{riskIcon(analysisResult.riskLevel)}</Text>
+                <View>
+                  <Text style={[styles.riskBannerTitle, { color: riskBannerStyle(analysisResult.riskLevel).textColor }]}>
+                    {riskTitle(analysisResult.riskLevel)}
+                  </Text>
+                  <Text style={[styles.riskBannerSub, { color: riskBannerStyle(analysisResult.riskLevel).textColor }]}>
+                    {analysisResult.summary ?? ''}
+                  </Text>
                 </View>
               </View>
-            ))
+
+              {/* Bristol Score */}
+              {analysisResult.bristolScore && (
+                <View style={styles.resultRow}>
+                  <Text style={styles.resultLabel}>Bristol 評分</Text>
+                  <Text style={styles.resultValue}>{analysisResult.bristolScore} / 7</Text>
+                </View>
+              )}
+
+              {/* 建議 */}
+              {analysisResult.recommendation && (
+                <View style={styles.recommendBox}>
+                  <Text style={styles.recommendLabel}>建議</Text>
+                  <Text style={styles.recommendText}>{analysisResult.recommendation}</Text>
+                </View>
+              )}
+            </View>
+
+            <View style={styles.modalActions}>
+              <Pressable style={[styles.modalButton, styles.uploadButton]} onPress={closeModal}>
+                <Text style={styles.uploadButtonText}>完成</Text>
+              </Pressable>
+            </View>
+          </ScrollView>
+        )}
+
+      </SafeAreaView>
+    </Modal>
+
+    <LinearGradient
+      colors={['rgba(32, 178, 170, 0.08)', '#ffffff', '#ffffff']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 0, y: 0.4 }}
+      style={styles.screen}>
+      <SafeAreaView style={styles.safeArea}>
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <View style={styles.avatarShell}>
+              {pets[0] ? (
+                <View style={styles.avatarPlaceholder}>
+                  <Ionicons name="paw" size={18} color="#20B2AA" />
+                </View>
+              ) : (
+                <View style={styles.avatarPlaceholder}>
+                  <Ionicons name="paw" size={18} color="#20B2AA" />
+                </View>
+              )}
+            </View>
+            <Text style={styles.brandName}>PupuPet</Text>
+          </View>
+          <Pressable style={styles.notifButton}>
+            <Ionicons name="notifications-outline" size={24} color="#006a65" />
+          </Pressable>
+        </View>
+
+        {/* Main Content */}
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={() => (user ? void loadDashboard(true) : undefined)}
+            />
+          }>
+          {/* Hero Text */}
+          <View style={styles.heroSection}>
+            <Text style={styles.heroTitle}>準備好健康檢查了嗎？</Text>
+            <Text style={styles.heroSubtitle}>確保你的毛孩今天狀態最佳。</Text>
+          </View>
+
+          {/* Scan Button */}
+          <View style={styles.scanButtonWrap}>
+            <Pressable
+              style={({ pressed }) => [styles.scanButton, pressed && styles.scanButtonPressed]}
+              onPress={() => void startScan()}
+              disabled={isUploading || !user}>
+              {isUploading ? (
+                <ActivityIndicator size="large" color="#ffffff" />
+              ) : (
+                <>
+                  <Ionicons name="camera" size={56} color="#ffffff" style={styles.scanIcon} />
+                  <Text style={styles.scanLabel}>開始掃描</Text>
+                </>
+              )}
+            </Pressable>
+          </View>
+
+          {/* Recent Logs */}
+          {recentLogs.length > 0 && (
+            <View style={styles.logsSection}>
+              <View style={styles.logsSectionHeader}>
+                <Text style={styles.logsSectionTitle}>最近紀錄</Text>
+                {isLoading && <ActivityIndicator size="small" color={palette.tint} />}
+              </View>
+              {recentLogs.map((log) => (
+                <View key={log.id} style={styles.logCard}>
+                  {log.imageUrl ? (
+                    <Image source={{ uri: log.imageUrl }} style={styles.logImage} contentFit="cover" />
+                  ) : (
+                    <View style={[styles.logImage, styles.logImageFallback]}>
+                      <Ionicons name="image-outline" size={24} color="#bbc9c7" />
+                    </View>
+                  )}
+                  <View style={styles.logMeta}>
+                    <View style={styles.logRow}>
+                      <Text style={styles.logPetName}>{log.petName}</Text>
+                      <StatusPill label={riskLabel(log.riskLevel, log.status)} tone={riskTone(log.riskLevel)} />
+                    </View>
+                    <Text style={styles.logDate}>
+                      {new Date(log.capturedAt).toLocaleString('zh-TW')}
+                    </Text>
+                    {log.summary ? (
+                      <Text style={styles.logSummary} numberOfLines={2}>{log.summary}</Text>
+                    ) : null}
+                  </View>
+                </View>
+              ))}
+            </View>
           )}
-        </ThemedView>
-      ) : null}
-    </ScrollView>
+
+          {user && recentLogs.length === 0 && !isLoading && (
+            <View style={styles.emptyState}>
+              <Ionicons name="paw-outline" size={40} color="#bbc9c7" />
+              <Text style={styles.emptyText}>還沒有紀錄，點上方按鈕開始第一次掃描。</Text>
+            </View>
+          )}
+        </ScrollView>
+      </SafeAreaView>
+    </LinearGradient>
+    </>
   );
 }
 
-function StatusPill({
-  label,
-  tone,
-}: {
-  label: string;
-  tone: 'danger' | 'neutral' | 'success' | 'warning';
-}) {
+function StatusPill({ label, tone }: { label: string; tone: 'danger' | 'neutral' | 'success' | 'warning' }) {
   const tones = {
-    danger: { backgroundColor: '#FDE2DC', color: '#9A3412' },
-    neutral: { backgroundColor: '#E8E3DA', color: '#54473F' },
-    success: { backgroundColor: '#D8F3E8', color: '#166534' },
-    warning: { backgroundColor: '#FCE7BF', color: '#92400E' },
+    danger: { bg: '#fde8e8', text: '#9a3412' },
+    neutral: { bg: '#e9efed', text: '#3c4948' },
+    success: { bg: '#d8f3e8', text: '#166534' },
+    warning: { bg: '#fef3c7', text: '#92400e' },
   };
-
   return (
-    <View style={[styles.pill, { backgroundColor: tones[tone].backgroundColor }]}>
-      <ThemedText style={[styles.pillText, { color: tones[tone].color }]}>{label}</ThemedText>
+    <View style={[styles.pill, { backgroundColor: tones[tone].bg }]}>
+      <Text style={[styles.pillText, { color: tones[tone].text }]}>{label}</Text>
     </View>
   );
 }
 
 function riskLabel(riskLevel: RiskLevel, status: string) {
-  if (status !== 'done') {
-    return '待分析';
-  }
-
-  if (riskLevel === 'normal') {
-    return '正常';
-  }
-
-  if (riskLevel === 'observe') {
-    return '觀察';
-  }
-
-  if (riskLevel === 'vet') {
-    return '就醫';
-  }
-
+  if (status !== 'done') return '待分析';
+  if (riskLevel === 'normal') return '正常';
+  if (riskLevel === 'observe') return '觀察';
+  if (riskLevel === 'vet') return '就醫';
   return '待補資料';
 }
 
 function riskTone(riskLevel: RiskLevel): 'danger' | 'neutral' | 'success' | 'warning' {
-  if (riskLevel === 'normal') {
-    return 'success';
-  }
-
-  if (riskLevel === 'observe') {
-    return 'warning';
-  }
-
-  if (riskLevel === 'vet') {
-    return 'danger';
-  }
-
+  if (riskLevel === 'normal') return 'success';
+  if (riskLevel === 'observe') return 'warning';
+  if (riskLevel === 'vet') return 'danger';
   return 'neutral';
 }
 
+function riskTitle(riskLevel: RiskLevel) {
+  if (riskLevel === 'normal') return '狀況正常';
+  if (riskLevel === 'observe') return '需要觀察';
+  if (riskLevel === 'vet') return '建議就醫';
+  return '分析完成';
+}
+
+function riskIcon(riskLevel: RiskLevel) {
+  if (riskLevel === 'normal') return '✅';
+  if (riskLevel === 'observe') return '⚠️';
+  if (riskLevel === 'vet') return '🏥';
+  return '📋';
+}
+
+function riskBannerStyle(riskLevel: RiskLevel) {
+  if (riskLevel === 'normal') return { backgroundColor: '#d8f3e8', borderColor: '#6ee7b7', textColor: '#065f46' };
+  if (riskLevel === 'observe') return { backgroundColor: '#fef3c7', borderColor: '#fcd34d', textColor: '#92400e' };
+  if (riskLevel === 'vet') return { backgroundColor: '#fde8e8', borderColor: '#fca5a5', textColor: '#9a3412' };
+  return { backgroundColor: '#e9efed', borderColor: '#bbc9c7', textColor: '#3c4948' };
+}
+
+const SCAN_BUTTON_SIZE = 224;
+
 const styles = StyleSheet.create({
-  banner: {
-    marginTop: 12,
-    fontSize: 14,
-    lineHeight: 20,
+  screen: {
+    flex: 1,
   },
-  button: {
+  safeArea: {
+    flex: 1,
+  },
+  header: {
     alignItems: 'center',
-    borderRadius: 16,
-    minHeight: 52,
-    justifyContent: 'center',
-    paddingHorizontal: 18,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
   },
-  buttonDisabled: {
-    opacity: 0.6,
+  headerLeft: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10,
   },
-  card: {
-    borderRadius: 28,
-    gap: 14,
-    marginHorizontal: 16,
-    marginTop: 16,
-    padding: 18,
-  },
-  chip: {
-    borderColor: '#D7C7B3',
+  avatarShell: {
     borderRadius: 999,
-    borderWidth: 1,
-    minHeight: 40,
+    height: 36,
+    overflow: 'hidden',
+    width: 36,
+  },
+  avatarPlaceholder: {
+    alignItems: 'center',
+    backgroundColor: '#e9efed',
+    borderRadius: 999,
+    height: 36,
     justifyContent: 'center',
-    paddingHorizontal: 14,
+    width: 36,
   },
-  chipText: {
-    fontSize: 14,
+  brandName: {
+    color: '#20B2AA',
+    fontWeight: '800',
+    fontSize: 20,
+    letterSpacing: -0.5,
   },
-  container: {
+  notifButton: {
+    alignItems: 'center',
+    borderRadius: 999,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
+  },
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    alignItems: 'center',
     paddingBottom: 40,
-    paddingTop: 20,
+    paddingTop: 16,
   },
-  eyebrow: {
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-  },
-  helperText: {
-    color: '#6C655C',
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  hero: {
-    borderRadius: 32,
-    marginHorizontal: 16,
-    minHeight: 180,
-    padding: 24,
-  },
-  heroBody: {
-    color: '#4A4339',
-    marginTop: 10,
+  heroSection: {
+    alignItems: 'center',
+    paddingHorizontal: 32,
+    gap: 8,
   },
   heroTitle: {
-    fontSize: 34,
-    lineHeight: 40,
-    marginTop: 8,
+    color: '#171d1c',
+    fontSize: 26,
+    fontWeight: '700',
+    textAlign: 'center',
+    letterSpacing: -0.5,
   },
-  input: {
-    backgroundColor: '#FFF9F1',
-    borderColor: '#E1D3C3',
-    borderRadius: 16,
-    borderWidth: 1,
-    color: '#2C241C',
+  heroSubtitle: {
+    color: '#6c7a78',
     fontSize: 16,
-    minHeight: 54,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  scanButtonWrap: {
+    alignItems: 'center',
+    marginTop: 40,
+    marginBottom: 48,
+  },
+  scanButton: {
+    alignItems: 'center',
+    backgroundColor: '#20B2AA',
+    borderRadius: SCAN_BUTTON_SIZE / 2,
+    height: SCAN_BUTTON_SIZE,
+    justifyContent: 'center',
+    width: SCAN_BUTTON_SIZE,
+    shadowColor: '#20B2AA',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  scanButtonPressed: {
+    transform: [{ scale: 0.97 }],
+    opacity: 0.9,
+  },
+  scanIcon: {
+    marginBottom: 8,
+  },
+  scanLabel: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  logsSection: {
+    gap: 12,
+    paddingHorizontal: 20,
+    width: '100%',
+  },
+  logsSectionHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  logsSectionTitle: {
+    color: '#171d1c',
+    fontSize: 17,
+    fontWeight: '700',
   },
   logCard: {
-    backgroundColor: '#FBF8F2',
-    borderRadius: 22,
-    gap: 14,
+    backgroundColor: '#f5fbf9',
+    borderRadius: 20,
+    gap: 12,
     overflow: 'hidden',
     padding: 12,
+    borderWidth: 1,
+    borderColor: '#e3e9e8',
   },
   logImage: {
-    borderRadius: 16,
-    height: 180,
+    borderRadius: 14,
+    height: 160,
     width: '100%',
   },
   logImageFallback: {
     alignItems: 'center',
-    backgroundColor: '#ECE4D8',
+    backgroundColor: '#e9efed',
     justifyContent: 'center',
   },
   logMeta: {
-    gap: 6,
+    gap: 4,
   },
   logRow: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  petChipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
+  logPetName: {
+    color: '#171d1c',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  logDate: {
+    color: '#6c7a78',
+    fontSize: 13,
+  },
+  logSummary: {
+    color: '#3c4948',
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 2,
   },
   pill: {
-    alignSelf: 'flex-start',
     borderRadius: 999,
     paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingVertical: 4,
   },
   pillText: {
     fontSize: 12,
     fontWeight: '700',
   },
-  preview: {
+  emptyState: {
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 24,
+    paddingHorizontal: 40,
+  },
+  emptyText: {
+    color: '#6c7a78',
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: 'center',
+  },
+  modalSafe: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+  },
+  modalHeader: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  modalTitle: {
+    color: '#171d1c',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  modalPreview: {
+    flex: 1,
+    marginHorizontal: 20,
     borderRadius: 24,
-    height: 240,
+    overflow: 'hidden',
+  },
+  modalActions: {
+    gap: 12,
+    padding: 24,
+  },
+  modalButton: {
+    alignItems: 'center',
+    borderRadius: 16,
+    height: 54,
+    justifyContent: 'center',
+  },
+  uploadButton: {
+    backgroundColor: '#20B2AA',
+  },
+  uploadButtonText: {
+    color: '#ffffff',
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  retakeButton: {
+    backgroundColor: '#e9efed',
+  },
+  retakeButtonText: {
+    color: '#3c4948',
+    fontSize: 17,
+    fontWeight: '600',
+  },
+  analyzingContainer: {
+    flex: 1,
+    position: 'relative',
+  },
+  analyzingImage: {
+    flex: 1,
+    opacity: 0.4,
+  },
+  analyzingOverlay: {
+    alignItems: 'center',
+    bottom: 0,
+    gap: 12,
+    justifyContent: 'center',
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+  },
+  analyzingTitle: {
+    color: '#171d1c',
+    fontSize: 22,
+    fontWeight: '700',
+  },
+  analyzingSubtitle: {
+    color: '#6c7a78',
+    fontSize: 15,
+  },
+  resultScroll: {
+    flex: 1,
+  },
+  resultContent: {
+    paddingBottom: 8,
+  },
+  resultImage: {
+    height: 260,
     width: '100%',
   },
-  primaryButton: {
-    backgroundColor: '#1E5E4F',
+  resultBody: {
+    gap: 16,
+    padding: 20,
   },
-  primaryButtonText: {
-    color: '#FFF9F0',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  secondaryButton: {
-    backgroundColor: '#EFE4D5',
-  },
-  secondaryButtonText: {
-    color: '#5E4632',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  sectionHeader: {
+  riskBanner: {
     alignItems: 'center',
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 14,
+    padding: 16,
+  },
+  riskBannerIcon: {
+    fontSize: 32,
+  },
+  riskBannerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  riskBannerSub: {
+    fontSize: 14,
+    marginTop: 2,
+    opacity: 0.8,
+  },
+  resultRow: {
+    alignItems: 'center',
+    backgroundColor: '#f5fbf9',
+    borderRadius: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
+    padding: 14,
   },
-  textArea: {
-    minHeight: 112,
-    textAlignVertical: 'top',
+  resultLabel: {
+    color: '#6c7a78',
+    fontSize: 15,
+  },
+  resultValue: {
+    color: '#171d1c',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  recommendBox: {
+    backgroundColor: '#f5fbf9',
+    borderRadius: 12,
+    gap: 6,
+    padding: 14,
+  },
+  recommendLabel: {
+    color: '#6c7a78',
+    fontSize: 13,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  recommendText: {
+    color: '#3c4948',
+    fontSize: 15,
+    lineHeight: 22,
   },
 });
