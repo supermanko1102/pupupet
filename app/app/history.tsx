@@ -2,6 +2,7 @@ import { Image } from 'expo-image';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Modal,
   Pressable,
   RefreshControl,
@@ -19,12 +20,14 @@ import { useSession } from '@/providers/session-provider';
 import type { Database } from '@/types/database';
 
 type RiskLevel = Database['public']['Tables']['poop_logs']['Row']['risk_level'];
+type Pet = Database['public']['Tables']['pets']['Row'];
 
 type LogItem = {
   capturedAt: string;
   id: string;
   imagePath: string;
   imageUrl: string | null;
+  petId: string | null;
   petName: string;
   recommendation: string | null;
   riskLevel: RiskLevel;
@@ -42,11 +45,13 @@ const PAGE_SIZE = 20;
 export default function HistoryScreen() {
   const { user } = useSession();
   const [logs, setLogs] = useState<LogItem[]>([]);
+  const [pets, setPets] = useState<Pet[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [detailLog, setDetailLog] = useState<LogItem | null>(null);
+  const [isAssigning, setIsAssigning] = useState(false);
   const offsetRef = useRef(0);
 
   const fetchLogs = useCallback(
@@ -63,7 +68,7 @@ export default function HistoryScreen() {
 
       const { data: rows } = await supabase
         .from('poop_logs')
-        .select('id, captured_at, image_path, status, summary, recommendation, risk_level, pets(name)')
+        .select('id, captured_at, image_path, status, summary, recommendation, risk_level, pet_id, pets(name)')
         .order('captured_at', { ascending: false })
         .range(offset, offset + PAGE_SIZE - 1);
 
@@ -72,7 +77,7 @@ export default function HistoryScreen() {
           const petName =
             row.pets && typeof row.pets === 'object' && 'name' in row.pets
               ? (row.pets as { name: string }).name
-              : '未命名寵物';
+              : '未分類';
           const { data: signedData } = await supabase!.storage
             .from('poop-photos')
             .createSignedUrl(row.image_path, 60 * 60);
@@ -81,6 +86,7 @@ export default function HistoryScreen() {
             id: row.id,
             imagePath: row.image_path,
             imageUrl: signedData?.signedUrl ?? null,
+            petId: row.pet_id ?? null,
             petName,
             recommendation: row.recommendation,
             riskLevel: row.risk_level,
@@ -108,7 +114,23 @@ export default function HistoryScreen() {
   useEffect(() => {
     offsetRef.current = 0;
     void fetchLogs(0);
-  }, [fetchLogs]);
+    if (supabase && user) {
+      void supabase.from('pets').select('*').order('created_at', { ascending: true }).then(({ data }) => {
+        setPets(data ?? []);
+      });
+    }
+  }, [fetchLogs, user]);
+
+  async function assignPet(logId: string, petId: string) {
+    if (!supabase) return;
+    setIsAssigning(true);
+    const { error } = await supabase.from('poop_logs').update({ pet_id: petId }).eq('id', logId);
+    setIsAssigning(false);
+    if (error) { Alert.alert('指定失敗', error.message); return; }
+    const pet = pets.find((p) => p.id === petId);
+    setDetailLog((prev) => prev ? { ...prev, petId, petName: pet?.name ?? prev.petName } : prev);
+    setLogs((prev) => prev.map((l) => l.id === logId ? { ...l, petId, petName: pet?.name ?? l.petName } : l));
+  }
 
   function handleRefresh() {
     offsetRef.current = 0;
@@ -214,10 +236,32 @@ export default function HistoryScreen() {
                   </View>
                 </View>
 
-                <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>寵物</Text>
-                  <Text style={styles.infoValue}>{detailLog.petName}</Text>
-                </View>
+                {detailLog.petId ? (
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>寵物</Text>
+                    <Text style={styles.infoValue}>{detailLog.petName}</Text>
+                  </View>
+                ) : (
+                  <View style={styles.unclassifiedBox}>
+                    <Text style={styles.unclassifiedLabel}>尚未分類</Text>
+                    {pets.length > 0 && (
+                      <View style={styles.petPickerRow}>
+                        {pets.map((pet) => (
+                          <Pressable
+                            key={pet.id}
+                            style={styles.petPickerButton}
+                            disabled={isAssigning}
+                            onPress={() => void assignPet(detailLog.id, pet.id)}>
+                            <Text style={styles.petPickerEmoji}>
+                              {pet.species === 'dog' ? '🐶' : pet.species === 'cat' ? '🐱' : '🐾'}
+                            </Text>
+                            <Text style={styles.petPickerName}>{pet.name}</Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                )}
                 <View style={styles.infoRow}>
                   <Text style={styles.infoLabel}>時間</Text>
                   <Text style={styles.infoValue}>
@@ -559,5 +603,44 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 17,
     fontWeight: '700',
+  },
+
+  // Pet assign in detail modal
+  unclassifiedBox: {
+    backgroundColor: '#f5fbf9',
+    borderRadius: 12,
+    gap: 10,
+    padding: 14,
+  },
+  unclassifiedLabel: {
+    color: '#6c7a78',
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
+  petPickerRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  petPickerButton: {
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderColor: '#e3e9e8',
+    borderRadius: 10,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  petPickerEmoji: {
+    fontSize: 16,
+  },
+  petPickerName: {
+    color: '#171d1c',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

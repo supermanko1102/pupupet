@@ -50,7 +50,8 @@ export default function HomeScreen() {
   const palette = Colors[colorScheme];
 
   const [pets, setPets] = useState<Pet[]>([]);
-  const [selectedPetId, setSelectedPetId] = useState<string | null>(null);
+  const [currentLogId, setCurrentLogId] = useState<string | null>(null);
+  const [petAssigned, setPetAssigned] = useState(false);
   const [recentLogs, setRecentLogs] = useState<RecentLog[]>([]);
   const [activeTab, setActiveTab] = useState<ActiveTab>('scan');
   const [menuOpen, setMenuOpen] = useState(false);
@@ -108,17 +109,13 @@ export default function HomeScreen() {
 
       const nextPets = petsData ?? [];
       setPets(nextPets);
-      setSelectedPetId((current) => {
-        if (current && nextPets.some((p) => p.id === current)) return current;
-        return nextPets[0]?.id ?? null;
-      });
 
       const nextLogs = await Promise.all(
         (logRows ?? []).map(async (row) => {
           const petNameValue =
             row.pets && typeof row.pets === 'object' && 'name' in row.pets
               ? row.pets.name
-              : '未命名寵物';
+              : '未分類';
           const { data } = await client.storage
             .from('poop-photos')
             .createSignedUrl(row.image_path, 60 * 60);
@@ -147,37 +144,20 @@ export default function HomeScreen() {
     void loadDashboard();
   }, [isReady, loadDashboard, user]);
 
-  async function ensureDefaultPet() {
-    if (!supabase) throw new Error('Supabase 尚未設定完成。');
-    const existingPetId = selectedPetId ?? pets[0]?.id;
-    if (existingPetId) return existingPetId;
-
-    const { data, error } = await supabase
-      .from('pets')
-      .insert({ name: '我的毛孩', species: 'dog' })
-      .select()
-      .single();
-
-    if (error) throw error;
-    setPets((current) => [data, ...current]);
-    setSelectedPetId(data.id);
-    return data.id;
-  }
-
   async function uploadAsset(asset: ImagePicker.ImagePickerAsset) {
     if (!supabase || !user) return;
     setCapturedAsset(asset);
     setModalPhase('analyzing');
     setIsUploading(true);
     try {
-      const petId = await ensureDefaultPet();
       const imagePath = await uploadPoopPhoto(user.id, asset);
       const { data: newLog, error } = await supabase
         .from('poop_logs')
-        .insert({ pet_id: petId, image_path: imagePath, status: 'uploaded' })
+        .insert({ image_path: imagePath, status: 'uploaded' })
         .select('id, image_path')
         .single();
       if (error) throw error;
+      setCurrentLogId(newLog.id);
       startPolling(newLog.id, newLog.image_path);
     } catch (err) {
       Alert.alert('上傳失敗', err instanceof Error ? err.message : '請稍後再試。');
@@ -185,6 +165,13 @@ export default function HomeScreen() {
     } finally {
       setIsUploading(false);
     }
+  }
+
+  async function assignPet(petId: string) {
+    if (!supabase || !currentLogId) return;
+    await supabase.from('poop_logs').update({ pet_id: petId }).eq('id', currentLogId);
+    setPetAssigned(true);
+    void loadDashboard();
   }
 
   async function startScan() {
@@ -259,6 +246,8 @@ export default function HomeScreen() {
     setCapturedAsset(null);
     setModalPhase('preview');
     setAnalysisResult(null);
+    setCurrentLogId(null);
+    setPetAssigned(false);
   }
 
   return (
@@ -309,12 +298,45 @@ export default function HomeScreen() {
                   <Text style={styles.recommendText}>{analysisResult.recommendation}</Text>
                 </View>
               )}
+
+              {/* 寵物分類 */}
+              {!analysisResult.failed && (
+                <View style={styles.petPickerSection}>
+                  {petAssigned ? (
+                    <Text style={styles.petPickerDone}>✓ 已分類</Text>
+                  ) : (
+                    <>
+                      <Text style={styles.petPickerTitle}>這是哪一隻的紀錄？</Text>
+                      {pets.length > 0 && (
+                        <View style={styles.petPickerRow}>
+                          {pets.map((pet) => (
+                            <Pressable
+                              key={pet.id}
+                              style={styles.petPickerButton}
+                              onPress={() => void assignPet(pet.id)}>
+                              <Text style={styles.petPickerEmoji}>
+                                {pet.species === 'dog' ? '🐶' : pet.species === 'cat' ? '🐱' : '🐾'}
+                              </Text>
+                              <Text style={styles.petPickerName}>{pet.name}</Text>
+                            </Pressable>
+                          ))}
+                        </View>
+                      )}
+                      <Pressable onPress={closeModal}>
+                        <Text style={styles.petPickerSkip}>略過，之後再分類</Text>
+                      </Pressable>
+                    </>
+                  )}
+                </View>
+              )}
             </View>
 
             <View style={styles.modalActions}>
-              <Pressable style={[styles.modalButton, styles.uploadButton]} onPress={closeModal}>
-                <Text style={styles.uploadButtonText}>完成</Text>
-              </Pressable>
+              {(petAssigned || analysisResult.failed) && (
+                <Pressable style={[styles.modalButton, styles.uploadButton]} onPress={closeModal}>
+                  <Text style={styles.uploadButtonText}>完成</Text>
+                </Pressable>
+              )}
             </View>
           </ScrollView>
         )}
@@ -927,5 +949,55 @@ const styles = StyleSheet.create({
     color: '#3c4948',
     fontSize: 15,
     lineHeight: 22,
+  },
+
+  // Pet picker in result modal
+  petPickerSection: {
+    borderTopColor: '#e3e9e8',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: 12,
+    paddingTop: 16,
+  },
+  petPickerTitle: {
+    color: '#6c7a78',
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
+  petPickerRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  petPickerButton: {
+    alignItems: 'center',
+    backgroundColor: '#f5fbf9',
+    borderColor: '#e3e9e8',
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  petPickerEmoji: {
+    fontSize: 18,
+  },
+  petPickerName: {
+    color: '#171d1c',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  petPickerSkip: {
+    color: '#bbc9c7',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  petPickerDone: {
+    color: '#16a34a',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });
