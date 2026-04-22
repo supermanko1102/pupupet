@@ -7,39 +7,47 @@ const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY')!;
 
 const MODEL = 'claude-opus-4-5';
 
-interface PoopLogRecord {
-  id: string;
-  pet_id: string;
-  image_path: string;
-  status: string;
-}
-
-interface WebhookPayload {
-  type: 'INSERT';
-  table: string;
-  record: PoopLogRecord;
-}
-
-Deno.serve(async (req) => {
+// Webhook 觸發後，透過 claim_poop_job() 原子性搶一筆 job
+// 避免多個 Edge Function instance 同時處理同一筆記錄
+Deno.serve(async (_req) => {
   try {
-    const payload: WebhookPayload = await req.json();
+    const result = await processOneJob();
+    return new Response(JSON.stringify(result), {
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch (err) {
+    console.error('analyze-poop error:', err);
+    return new Response(JSON.stringify({ error: String(err) }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+});
 
-    if (payload.type !== 'INSERT' || payload.table !== 'poop_logs') {
-      return new Response('skip', { status: 200 });
-    }
+export async function processOneJob(): Promise<{ success: boolean; id?: string; skipped?: boolean }> {
+  const adminClient = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { id, image_path } = payload.record;
+  // 原子性 claim：FOR UPDATE SKIP LOCKED，只有一個 instance 能拿到
+  const { data: jobs, error: claimError } = await adminClient
+    .rpc('claim_poop_job');
 
-    // 1. 把 status 改成 analyzing
-    await updateLog(id, { status: 'analyzing' });
+  if (claimError) throw new Error(`claim_poop_job failed: ${claimError.message}`);
 
-    // 2. 從 Storage 取得圖片（signed URL）
-    const imageBase64 = await fetchImageAsBase64(image_path);
+  if (!jobs || jobs.length === 0) {
+    // 沒有可處理的 job（已被其他 instance 搶走，或本來就沒有）
+    return { success: true, skipped: true };
+  }
 
-    // 3. 呼叫 Claude Vision API
+  const { job_id: id, job_image_path: image_path } = jobs[0];
+
+  try {
+    // 從 Storage 取得圖片
+    const imageBase64 = await fetchImageAsBase64(image_path, adminClient);
+
+    // 呼叫 Claude Vision API
     const analysis = await analyzeWithClaude(imageBase64);
 
-    // 4. 把結果寫回 poop_logs
+    // 寫回結果
     await updateLog(id, {
       status: 'done',
       bristol_score: analysis.bristolScore,
@@ -53,29 +61,19 @@ Deno.serve(async (req) => {
       ai_raw_json: analysis.raw,
     });
 
-    return new Response(JSON.stringify({ success: true, id }), {
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return { success: true, id };
   } catch (err) {
-    console.error('analyze-poop error:', err);
-    // 盡量把 status 改成 failed
-    try {
-      const payload: WebhookPayload = await new Response(req.body).json().catch(() => null);
-      if (payload?.record?.id) {
-        await updateLog(payload.record.id, { status: 'failed' });
-      }
-    } catch {}
-
-    return new Response(JSON.stringify({ error: String(err) }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    // 分析失敗：把 status 改成 failed，讓 reset_stuck_jobs 不會重試
+    console.error(`job ${id} failed:`, err);
+    await updateLog(id, { status: 'failed' }).catch(() => {});
+    throw err;
   }
-});
+}
 
-async function fetchImageAsBase64(imagePath: string): Promise<string> {
-  const adminClient = createClient(supabaseUrl, supabaseServiceKey);
-
+async function fetchImageAsBase64(
+  imagePath: string,
+  adminClient: ReturnType<typeof createClient>
+): Promise<string> {
   const { data, error } = await adminClient.storage
     .from('poop-photos')
     .download(imagePath);
