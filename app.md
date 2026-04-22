@@ -1,78 +1,99 @@
--- 啟用 UUID 擴充
-create extension if not exists "uuid-ossp";
+# PupuPet（口袋便便）— 專案總覽
 
--- 1. users（對應 Supabase Auth，擴充欄位）
-create table users (
-id uuid primary key references auth.users(id) on delete cascade,
-email text unique not null,
-display_name text,
-avatar_url text,
-total_points int not null default 0,
-created_at timestamptz not null default now()
-);
+> 上次同步：2026-04-22
 
--- 2. dogs（一個用戶可以有多隻狗）
-create table dogs (
-id uuid primary key default uuid_generate_v4(),
-user_id uuid not null references users(id) on delete cascade,
-name text not null,
-breed text,
-birthday date,
-weight_kg numeric(4,1),
-avatar_url text,
-created_at timestamptz not null default now()
-);
+---
 
--- 3. card_definitions（角色卡定義，由你後台管理）
-create table card_definitions (
-id uuid primary key default uuid_generate_v4(),
-name text not null,
-description text,
-rarity text not null check (rarity in ('common','rare','epic','legendary')),
-trigger_condition text not null, -- e.g. 'bristol_eq_4', 'streak_gte_7'
-illustration_url text,
-created_at timestamptz not null default now()
-);
+## 產品定位
 
--- 4. poop_logs（每次拍照記錄）
-create table poop_logs (
-id uuid primary key default uuid_generate_v4(),
-dog_id uuid not null references dogs(id) on delete cascade,
-image_url text not null,
-bristol_score int check (bristol_score between 1 and 7),
-color text, -- 'brown','yellow','black','red','green'
-consistency text, -- 'hard','normal','soft','liquid'
-ai_status text not null check (ai_status in ('normal','watch','vet')),
-ai_summary text, -- 給用戶看的一句話
-ai_raw_json jsonb, -- Claude 完整回傳，備查
-points_earned int not null default 0,
-card_unlocked_id uuid references card_definitions(id),
-logged_at timestamptz not null default now()
-);
+拍一張寵物糞便照 → AI 即時分析健康狀態 → 飼主看到風險等級 + 建議
 
--- 5. user_cards（用戶收藏的角色卡）
-create table user_cards (
-id uuid primary key default uuid_generate_v4(),
-user_id uuid not null references users(id) on delete cascade,
-card_def_id uuid not null references card_definitions(id),
-poop_log_id uuid references poop_logs(id), -- 第一次解鎖的那筆記錄
-count int not null default 1, -- 同一張卡可以重複獲得
-first_unlocked_at timestamptz not null default now(),
-unique (user_id, card_def_id)
-);
+---
 
-create or replace function handle_new_user()
-returns trigger language plpgsql security definer as $$
-begin
-insert into public.users (id, email)
-values (new.id, new.email);
-return new;
-end;
+## 技術棧
 
-$$
-;
+| 層級 | 技術 |
+|------|------|
+| App | React Native + Expo Router（iOS 優先） |
+| 後端 / DB | Supabase（Auth、PostgreSQL、Storage、Edge Functions） |
+| AI | Claude Vision API（claude-opus-4-5）|
+| 登入 | Apple Sign In（透過 Supabase Auth） |
 
-create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute procedure handle_new_user();
-$$
+---
+
+## 目錄結構
+
+```
+pupupet/
+├── app/                          # Expo 專案根目錄
+│   ├── app/
+│   │   ├── _layout.tsx           # Root layout，SessionProvider 包裹全局
+│   │   ├── sign-in.tsx           # 登入頁（Apple Sign In）
+│   │   └── (tabs)/
+│   │       ├── _layout.tsx       # Tab bar，未登入時 redirect → /sign-in
+│   │       ├── index.tsx         # 主頁：拍照 / 上傳 / 輪詢 / 結果
+│   │       └── explore.tsx       # 設定頁：寵物資料 + 登出
+│   ├── components/
+│   │   └── apple-sign-in-card.tsx
+│   ├── providers/
+│   │   └── session-provider.tsx  # useSession hook，管理 auth 狀態
+│   ├── lib/
+│   │   ├── supabase.ts           # Supabase client（anon key）
+│   │   ├── uploads.ts            # uploadPoopPhoto()
+│   │   └── env.ts                # 環境變數讀取與驗證
+│   ├── types/
+│   │   └── database.ts           # Supabase 型別定義（從 schema 生成）
+│   ├── constants/
+│   │   └── theme.ts
+│   └── supabase/
+│       ├── schema.sql            # 資料庫 DDL + RLS policies（source of truth）
+│       └── functions/
+│           └── analyze-poop/
+│               └── index.ts      # Edge Function：AI 分析（Webhook 觸發）
+├── docs/
+│   ├── db.md                     # 資料庫欄位說明
+│   └── api.md                    # API / Edge Function 說明
+└── app.md                        # 本文件
+```
+
+---
+
+## 核心功能流程
+
+```
+用戶拍照 / 選圖
+  └── 上傳至 Storage（poop-photos bucket）
+  └── 建立 poop_logs row（status: 'uploaded'）
+        └── Webhook 觸發 analyze-poop Edge Function
+              └── 更新 status → 'analyzing'
+              └── 呼叫 Claude Vision API
+              └── 更新 status → 'done'，寫入分析結果
+  └── App 每 2 秒輪詢 status
+        └── done → 顯示結果 modal（風險等級 / Bristol / 建議）
+        └── failed → 顯示失敗提示
+```
+
+---
+
+## 詳細文件
+
+- **資料庫 schema：** [docs/db.md](docs/db.md)
+- **API / Edge Function：** [docs/api.md](docs/api.md)
+
+---
+
+## MVP 現況
+
+已完成：
+- Apple Sign In + Session 管理
+- 拍照 / 相簿選圖 + Storage 上傳
+- Edge Function AI 分析（Claude Vision）
+- 輪詢 + 結果 modal
+- 設定頁（寵物資料編輯）
+- 最近 8 筆紀錄首頁
+
+待規劃：
+- 多隻寵物切換
+- 歷史紀錄完整列表頁
+- 推播通知（分析完成）
+- Realtime 訂閱取代輪詢
