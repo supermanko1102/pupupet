@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   Modal,
   Pressable,
   RefreshControl,
@@ -16,6 +17,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+
+import { SettingsPanel } from '@/components/settings-panel';
 
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -46,6 +49,22 @@ export default function HomeScreen() {
   const [pets, setPets] = useState<Pet[]>([]);
   const [selectedPetId, setSelectedPetId] = useState<string | null>(null);
   const [recentLogs, setRecentLogs] = useState<RecentLog[]>([]);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const iconAnim = useRef(new Animated.Value(0)).current;
+
+  const menuOpacity = iconAnim.interpolate({ inputRange: [0, 0.4, 1], outputRange: [1, 0, 0] });
+  const closeOpacity = iconAnim.interpolate({ inputRange: [0, 0.6, 1], outputRange: [0, 0, 1] });
+  const closeRotate = iconAnim.interpolate({ inputRange: [0, 1], outputRange: ['-90deg', '0deg'] });
+
+  function openMenu() {
+    setMenuOpen(true);
+    Animated.timing(iconAnim, { toValue: 1, duration: 220, useNativeDriver: true }).start();
+  }
+
+  function closeMenu() {
+    Animated.timing(iconAnim, { toValue: 0, duration: 180, useNativeDriver: true }).start(() => setMenuOpen(false));
+  }
+
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -307,36 +326,35 @@ export default function HomeScreen() {
       <SafeAreaView style={styles.safeArea}>
         {/* Header */}
         <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <View style={styles.avatarShell}>
-              {pets[0] ? (
-                <View style={styles.avatarPlaceholder}>
-                  <Ionicons name="paw" size={18} color="#20B2AA" />
-                </View>
-              ) : (
-                <View style={styles.avatarPlaceholder}>
-                  <Ionicons name="paw" size={18} color="#20B2AA" />
-                </View>
-              )}
+          <Pressable style={styles.hamburgerButton} onPress={menuOpen ? closeMenu : openMenu}>
+            <View style={styles.iconWrap}>
+              <Animated.View style={[StyleSheet.absoluteFill, { opacity: menuOpacity }]}>
+                <Ionicons name="menu" size={26} color="#006a65" />
+              </Animated.View>
+              <Animated.View style={[StyleSheet.absoluteFill, { opacity: closeOpacity, transform: [{ rotate: closeRotate }] }]}>
+                <Ionicons name="close" size={26} color="#006a65" />
+              </Animated.View>
             </View>
-            <Text style={styles.brandName}>PupuPet</Text>
-          </View>
+          </Pressable>
+          <Text style={styles.brandName}>PupuPet</Text>
           <Pressable style={styles.notifButton}>
             <Ionicons name="notifications-outline" size={24} color="#006a65" />
           </Pressable>
         </View>
 
-        {/* Main Content */}
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefreshing}
-              onRefresh={() => (user ? void loadDashboard(true) : undefined)}
-            />
-          }>
+        {/* Content area */}
+        <View style={styles.contentArea}>
+          {/* Main Content */}
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={isRefreshing}
+                onRefresh={() => (user ? void loadDashboard(true) : undefined)}
+              />
+            }>
           {/* Hero Text */}
           <View style={styles.heroSection}>
             <Text style={styles.heroTitle}>準備好健康檢查了嗎？</Text>
@@ -411,7 +429,16 @@ export default function HomeScreen() {
               <Text style={styles.emptyText}>還沒有紀錄，點上方按鈕開始第一次掃描。</Text>
             </View>
           )}
-        </ScrollView>
+          </ScrollView>
+
+          {/* Settings overlay */}
+          {menuOpen && (
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: '#ffffff' }]}>
+              <SettingsPanel />
+            </View>
+          )}
+        </View>
+
       </SafeAreaView>
     </LinearGradient>
 
@@ -457,6 +484,7 @@ export default function HomeScreen() {
         )}
       </SafeAreaView>
     </Modal>
+
     </>
   );
 }
@@ -527,24 +555,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 12,
   },
-  headerLeft: {
+  hamburgerButton: {
     alignItems: 'center',
-    flexDirection: 'row',
-    gap: 10,
-  },
-  avatarShell: {
-    borderRadius: 999,
-    height: 36,
-    overflow: 'hidden',
-    width: 36,
-  },
-  avatarPlaceholder: {
-    alignItems: 'center',
-    backgroundColor: '#e9efed',
-    borderRadius: 999,
-    height: 36,
+    height: 40,
     justifyContent: 'center',
-    width: 36,
+    width: 40,
+  },
+  iconWrap: {
+    height: 26,
+    width: 26,
+  },
+  contentArea: {
+    flex: 1,
+    overflow: 'hidden',
   },
   brandName: {
     color: '#20B2AA',

@@ -11,28 +11,37 @@ export type Database = {
     Tables: {
       pets: {
         Row: {
+          birthday: string | null;
+          breed: string | null;
           created_at: string;
           id: string;
           name: string;
           notes: string | null;
           species: 'dog' | 'cat' | 'other';
           user_id: string;
+          weight_kg: number | null;
         };
         Insert: {
+          birthday?: string | null;
+          breed?: string | null;
           created_at?: string;
           id?: string;
           name: string;
           notes?: string | null;
           species?: 'dog' | 'cat' | 'other';
           user_id?: string;
+          weight_kg?: number | null;
         };
         Update: {
+          birthday?: string | null;
+          breed?: string | null;
           created_at?: string;
           id?: string;
           name?: string;
           notes?: string | null;
           species?: 'dog' | 'cat' | 'other';
           user_id?: string;
+          weight_kg?: number | null;
         };
         Relationships: [];
       };
