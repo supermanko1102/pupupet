@@ -56,7 +56,7 @@ export type Database = {
           id: string;
           image_path: string;
           model_version: string | null;
-          pet_id: string;
+          pet_id: string | null;
           recommendation: string | null;
           risk_level: 'normal' | 'observe' | 'vet' | null;
           status: 'uploaded' | 'analyzing' | 'done' | 'failed';
@@ -73,7 +73,7 @@ export type Database = {
           id?: string;
           image_path: string;
           model_version?: string | null;
-          pet_id: string;
+          pet_id?: string | null;
           recommendation?: string | null;
           risk_level?: 'normal' | 'observe' | 'vet' | null;
           status?: 'uploaded' | 'analyzing' | 'done' | 'failed';
@@ -90,7 +90,7 @@ export type Database = {
           id?: string;
           image_path?: string;
           model_version?: string | null;
-          pet_id?: string;
+          pet_id?: string | null;
           recommendation?: string | null;
           risk_level?: 'normal' | 'observe' | 'vet' | null;
           status?: 'uploaded' | 'analyzing' | 'done' | 'failed';

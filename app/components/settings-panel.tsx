@@ -16,16 +16,17 @@ import { useSession } from '@/providers/session-provider';
 import type { Database } from '@/types/database';
 
 type Pet = Database['public']['Tables']['pets']['Row'];
-type Screen = 'menu' | 'pet' | 'account';
+type Species = Pet['species'];
+type Screen = 'menu' | 'pets' | 'pet-edit' | 'account';
 
-// ─── 共用 Back Header ──────────────────────────────────────────────────────────
+// ─── Sub Header ───────────────────────────────────────────────────────────────
 
-function SubHeader({ title, onBack }: { title: string; onBack: () => void }) {
+function SubHeader({ title, onBack, backLabel = '設定' }: { title: string; onBack: () => void; backLabel?: string }) {
   return (
     <View style={styles.subHeader}>
       <Pressable style={styles.backButton} onPress={onBack}>
         <Ionicons name="chevron-back" size={22} color="#20B2AA" />
-        <Text style={styles.backText}>設定</Text>
+        <Text style={styles.backText}>{backLabel}</Text>
       </Pressable>
       <Text style={styles.subTitle}>{title}</Text>
       <View style={styles.backButton} />
@@ -33,7 +34,7 @@ function SubHeader({ title, onBack }: { title: string; onBack: () => void }) {
   );
 }
 
-// ─── 選單列 ────────────────────────────────────────────────────────────────────
+// ─── Menu Item ────────────────────────────────────────────────────────────────
 
 function MenuItem({
   icon,
@@ -61,66 +62,148 @@ function MenuItem({
   );
 }
 
-// ─── 主選單 ────────────────────────────────────────────────────────────────────
+// ─── Main Menu ────────────────────────────────────────────────────────────────
 
 function MenuView({ onNavigate }: { onNavigate: (screen: Screen) => void }) {
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <Text style={styles.pageTitle}>設定</Text>
-
       <View style={styles.section}>
-        <MenuItem icon="paw" label="寵物資料" onPress={() => onNavigate('pet')} />
+        <MenuItem icon="paw" label="寵物管理" onPress={() => onNavigate('pets')} />
         <MenuItem icon="person" label="帳號管理" onPress={() => onNavigate('account')} isLast />
       </View>
     </ScrollView>
   );
 }
 
-// ─── 寵物資料 ──────────────────────────────────────────────────────────────────
+// ─── Pets List ────────────────────────────────────────────────────────────────
 
-function PetView({ onBack }: { onBack: () => void }) {
+const SPECIES_EMOJI: Record<Species, string> = { dog: '🐶', cat: '🐱', other: '🐾' };
+
+function PetsListView({
+  onBack,
+  onEditPet,
+}: {
+  onBack: () => void;
+  onEditPet: (pet: Pet | null) => void;
+}) {
   const { user } = useSession();
-  const [pet, setPet] = useState<Pet | null>(null);
+  const [pets, setPets] = useState<Pet[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [name, setName] = useState('');
-  const [breed, setBreed] = useState('');
-  const [weightKg, setWeightKg] = useState('');
 
-  const loadPet = useCallback(async () => {
+  const load = useCallback(async () => {
     if (!supabase || !user) return;
     setIsLoading(true);
     const { data } = await supabase
       .from('pets')
       .select('*')
-      .order('created_at', { ascending: true })
-      .limit(1)
-      .single();
-    if (data) {
-      setPet(data);
-      setName(data.name);
-      setBreed(data.breed ?? '');
-      setWeightKg(data.weight_kg ? String(data.weight_kg) : '');
-    }
+      .order('created_at', { ascending: true });
+    setPets(data ?? []);
     setIsLoading(false);
   }, [user]);
 
-  useEffect(() => { void loadPet(); }, [loadPet]);
+  useEffect(() => { void load(); }, [load]);
 
-  async function savePet() {
+  return (
+    <>
+      <SubHeader title="寵物管理" onBack={onBack} />
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {isLoading ? (
+          <ActivityIndicator color="#20B2AA" style={{ marginVertical: 40 }} />
+        ) : (
+          <>
+            {pets.length > 0 && (
+              <View style={styles.section}>
+                {pets.map((pet, idx) => (
+                  <Pressable
+                    key={pet.id}
+                    style={({ pressed }) => [
+                      styles.menuItem,
+                      idx === pets.length - 1 && styles.menuItemLast,
+                      pressed && styles.menuItemPressed,
+                    ]}
+                    onPress={() => onEditPet(pet)}>
+                    <View style={styles.menuItemLeft}>
+                      <Text style={styles.petEmoji}>{SPECIES_EMOJI[pet.species]}</Text>
+                      <View>
+                        <Text style={styles.menuItemLabel}>{pet.name}</Text>
+                        {(pet.breed || pet.weight_kg) && (
+                          <Text style={styles.petMeta}>
+                            {[pet.breed, pet.weight_kg ? `${pet.weight_kg} kg` : null]
+                              .filter(Boolean)
+                              .join('・')}
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color="#bbc9c7" />
+                  </Pressable>
+                ))}
+              </View>
+            )}
+
+            {pets.length === 0 && (
+              <Text style={styles.emptyHint}>還沒有寵物檔案，點下方按鈕新增。</Text>
+            )}
+
+            <Pressable style={styles.addButton} onPress={() => onEditPet(null)}>
+              <Ionicons name="add" size={20} color="#ffffff" />
+              <Text style={styles.addButtonText}>新增寵物</Text>
+            </Pressable>
+          </>
+        )}
+      </ScrollView>
+    </>
+  );
+}
+
+// ─── Pet Edit / Create ────────────────────────────────────────────────────────
+
+const SPECIES_OPTIONS: { value: Species; label: string }[] = [
+  { value: 'dog', label: '🐶 狗' },
+  { value: 'cat', label: '🐱 貓' },
+  { value: 'other', label: '🐾 其他' },
+];
+
+function PetEditView({
+  pet,
+  onBack,
+  onSaved,
+  onDeleted,
+}: {
+  pet: Pet | null;
+  onBack: () => void;
+  onSaved: () => void;
+  onDeleted: () => void;
+}) {
+  const { user } = useSession();
+  const isNew = pet === null;
+
+  const [name, setName] = useState(pet?.name ?? '');
+  const [breed, setBreed] = useState(pet?.breed ?? '');
+  const [weightKg, setWeightKg] = useState(pet?.weight_kg ? String(pet.weight_kg) : '');
+  const [species, setSpecies] = useState<Species>(pet?.species ?? 'dog');
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  async function save() {
     if (!supabase || !user || !name.trim()) return;
     setIsSaving(true);
-    const fields = { name: name.trim(), breed: breed.trim() || null, weight_kg: weightKg ? parseFloat(weightKg) : null };
+    const fields = {
+      name: name.trim(),
+      breed: breed.trim() || null,
+      weight_kg: weightKg ? parseFloat(weightKg) : null,
+      species,
+    };
     try {
-      if (pet) {
-        const { error } = await supabase.from('pets').update(fields).eq('id', pet.id);
+      if (isNew) {
+        const { error } = await supabase.from('pets').insert(fields);
         if (error) throw error;
       } else {
-        const { data, error } = await supabase.from('pets').insert({ ...fields, species: 'dog' }).select().single();
+        const { error } = await supabase.from('pets').update(fields).eq('id', pet.id);
         if (error) throw error;
-        setPet(data);
       }
-      Alert.alert('儲存成功', '寵物資料已更新。');
+      onSaved();
     } catch (err) {
       Alert.alert('儲存失敗', err instanceof Error ? err.message : '請稍後再試。');
     } finally {
@@ -128,43 +211,127 @@ function PetView({ onBack }: { onBack: () => void }) {
     }
   }
 
+  function confirmDelete() {
+    Alert.alert(
+      `刪除 ${pet?.name}`,
+      '刪除後，相關紀錄將變成未分類。確定要刪除嗎？',
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '刪除',
+          style: 'destructive',
+          onPress: async () => {
+            if (!supabase || !pet) return;
+            setIsDeleting(true);
+            const { error } = await supabase.from('pets').delete().eq('id', pet.id);
+            setIsDeleting(false);
+            if (error) {
+              Alert.alert('刪除失敗', error.message);
+            } else {
+              onDeleted();
+            }
+          },
+        },
+      ]
+    );
+  }
+
   return (
     <>
-      <SubHeader title="寵物資料" onBack={onBack} />
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-        {isLoading ? (
-          <ActivityIndicator color="#20B2AA" style={{ marginVertical: 40 }} />
-        ) : (
-          <View style={styles.section}>
-            <View style={styles.field}>
-              <Text style={styles.fieldLabel}>名字</Text>
-              <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="例如：小白" placeholderTextColor="#bbc9c7" />
-            </View>
-            <View style={styles.divider} />
-            <View style={styles.field}>
-              <Text style={styles.fieldLabel}>品種</Text>
-              <TextInput style={styles.input} value={breed} onChangeText={setBreed} placeholder="例如：柴犬" placeholderTextColor="#bbc9c7" />
-            </View>
-            <View style={styles.divider} />
-            <View style={styles.field}>
-              <Text style={styles.fieldLabel}>體重（kg）</Text>
-              <TextInput style={styles.input} value={weightKg} onChangeText={setWeightKg} placeholder="例如：5.2" placeholderTextColor="#bbc9c7" keyboardType="decimal-pad" />
+      <SubHeader
+        title={isNew ? '新增寵物' : '編輯寵物'}
+        onBack={onBack}
+        backLabel="寵物管理"
+      />
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled">
+
+        {/* 物種選擇 */}
+        <View style={styles.section}>
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>種類</Text>
+            <View style={styles.speciesRow}>
+              {SPECIES_OPTIONS.map((opt) => (
+                <Pressable
+                  key={opt.value}
+                  style={[styles.speciesButton, species === opt.value && styles.speciesButtonActive]}
+                  onPress={() => setSpecies(opt.value)}>
+                  <Text style={[styles.speciesButtonText, species === opt.value && styles.speciesButtonTextActive]}>
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              ))}
             </View>
           </View>
-        )}
+          <View style={styles.divider} />
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>名字</Text>
+            <TextInput
+              style={styles.input}
+              value={name}
+              onChangeText={setName}
+              placeholder="例如：小白"
+              placeholderTextColor="#bbc9c7"
+            />
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>品種</Text>
+            <TextInput
+              style={styles.input}
+              value={breed}
+              onChangeText={setBreed}
+              placeholder="例如：柴犬"
+              placeholderTextColor="#bbc9c7"
+            />
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>體重（kg）</Text>
+            <TextInput
+              style={styles.input}
+              value={weightKg}
+              onChangeText={setWeightKg}
+              placeholder="例如：5.2"
+              placeholderTextColor="#bbc9c7"
+              keyboardType="decimal-pad"
+            />
+          </View>
+        </View>
 
         <Pressable
           style={[styles.saveButton, (isSaving || !name.trim()) && { opacity: 0.5 }]}
-          onPress={() => void savePet()}
+          onPress={() => void save()}
           disabled={isSaving || !name.trim()}>
-          {isSaving ? <ActivityIndicator color="#ffffff" /> : <Text style={styles.saveButtonText}>儲存</Text>}
+          {isSaving
+            ? <ActivityIndicator color="#ffffff" />
+            : <Text style={styles.saveButtonText}>{isNew ? '新增' : '儲存'}</Text>}
         </Pressable>
+
+        {!isNew && (
+          <Pressable
+            style={[styles.deleteButton, isDeleting && { opacity: 0.5 }]}
+            onPress={confirmDelete}
+            disabled={isDeleting}>
+            {isDeleting
+              ? <ActivityIndicator color="#9a3412" />
+              : (
+                <>
+                  <Ionicons name="trash-outline" size={16} color="#9a3412" />
+                  <Text style={styles.deleteButtonText}>刪除寵物檔案</Text>
+                </>
+              )}
+          </Pressable>
+        )}
       </ScrollView>
     </>
   );
 }
 
-// ─── 帳號管理 ──────────────────────────────────────────────────────────────────
+// ─── Account ──────────────────────────────────────────────────────────────────
 
 function AccountView({ onBack }: { onBack: () => void }) {
   const { user } = useSession();
@@ -186,7 +353,6 @@ function AccountView({ onBack }: { onBack: () => void }) {
             <Text style={styles.infoValue} numberOfLines={1}>{user?.email ?? '—'}</Text>
           </View>
         </View>
-
         <Pressable style={styles.signOutButton} onPress={handleSignOut}>
           <Ionicons name="log-out-outline" size={18} color="#9a3412" />
           <Text style={styles.signOutText}>登出</Text>
@@ -196,21 +362,40 @@ function AccountView({ onBack }: { onBack: () => void }) {
   );
 }
 
-// ─── 主元件 ────────────────────────────────────────────────────────────────────
+// ─── Root ─────────────────────────────────────────────────────────────────────
 
 export function SettingsPanel() {
-  const [view, setView] = useState<Screen>('menu');
+  const [screen, setScreen] = useState<Screen>('menu');
+  const [editingPet, setEditingPet] = useState<Pet | null>(null);
+
+  function openPetEdit(pet: Pet | null) {
+    setEditingPet(pet);
+    setScreen('pet-edit');
+  }
 
   return (
     <View style={styles.panel}>
-      {view === 'menu' && <MenuView onNavigate={setView} />}
-      {view === 'pet' && <PetView onBack={() => setView('menu')} />}
-      {view === 'account' && <AccountView onBack={() => setView('menu')} />}
+      {screen === 'menu' && <MenuView onNavigate={setScreen} />}
+      {screen === 'pets' && (
+        <PetsListView
+          onBack={() => setScreen('menu')}
+          onEditPet={openPetEdit}
+        />
+      )}
+      {screen === 'pet-edit' && (
+        <PetEditView
+          pet={editingPet}
+          onBack={() => setScreen('pets')}
+          onSaved={() => setScreen('pets')}
+          onDeleted={() => setScreen('pets')}
+        />
+      )}
+      {screen === 'account' && <AccountView onBack={() => setScreen('menu')} />}
     </View>
   );
 }
 
-// ─── Styles ────────────────────────────────────────────────────────────────────
+// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   panel: {
@@ -260,7 +445,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 
-  // Menu
+  // Section / Menu
   section: {
     backgroundColor: '#f5fbf9',
     borderColor: '#e3e9e8',
@@ -302,6 +487,38 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 
+  // Pet list
+  petEmoji: {
+    fontSize: 28,
+    width: 36,
+    textAlign: 'center',
+  },
+  petMeta: {
+    color: '#6c7a78',
+    fontSize: 12,
+    marginTop: 1,
+  },
+  emptyHint: {
+    color: '#bbc9c7',
+    fontSize: 14,
+    textAlign: 'center',
+    marginVertical: 20,
+  },
+  addButton: {
+    alignItems: 'center',
+    backgroundColor: '#20B2AA',
+    borderRadius: 14,
+    flexDirection: 'row',
+    gap: 6,
+    height: 50,
+    justifyContent: 'center',
+  },
+  addButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+
   // Form
   field: {
     gap: 6,
@@ -325,6 +542,35 @@ const styles = StyleSheet.create({
     height: StyleSheet.hairlineWidth,
     marginLeft: 16,
   },
+
+  // Species selector
+  speciesRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 4,
+  },
+  speciesButton: {
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: '#e3e9e8',
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  speciesButtonActive: {
+    borderColor: '#20B2AA',
+    backgroundColor: '#eaf4f4',
+  },
+  speciesButtonText: {
+    color: '#6c7a78',
+    fontSize: 14,
+  },
+  speciesButtonTextActive: {
+    color: '#20B2AA',
+    fontWeight: '700',
+  },
+
+  // Buttons
   saveButton: {
     alignItems: 'center',
     backgroundColor: '#20B2AA',
@@ -336,6 +582,20 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '700',
+  },
+  deleteButton: {
+    alignItems: 'center',
+    backgroundColor: '#fde8e8',
+    borderRadius: 14,
+    flexDirection: 'row',
+    gap: 6,
+    height: 50,
+    justifyContent: 'center',
+  },
+  deleteButtonText: {
+    color: '#9a3412',
+    fontSize: 15,
+    fontWeight: '600',
   },
 
   // Account
