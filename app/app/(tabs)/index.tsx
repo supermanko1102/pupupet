@@ -1,6 +1,7 @@
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -278,14 +279,6 @@ export default function HomeScreen() {
                 </View>
               </View>
 
-              {/* Bristol Score */}
-              {analysisResult.bristolScore && (
-                <View style={styles.resultRow}>
-                  <Text style={styles.resultLabel}>Bristol 評分</Text>
-                  <Text style={styles.resultValue}>{analysisResult.bristolScore} / 7</Text>
-                </View>
-              )}
-
               {/* 建議 */}
               {analysisResult.recommendation && (
                 <View style={styles.recommendBox}>
@@ -379,7 +372,12 @@ export default function HomeScreen() {
             <View style={styles.logsSection}>
               <View style={styles.logsSectionHeader}>
                 <Text style={styles.logsSectionTitle}>最近紀錄</Text>
-                {isLoading && <ActivityIndicator size="small" color={palette.tint} />}
+                <View style={styles.logsSectionRight}>
+                  {isLoading && <ActivityIndicator size="small" color={palette.tint} />}
+                  <Pressable onPress={() => router.push('/history' as never)}>
+                    <Text style={styles.viewAllText}>查看全部</Text>
+                  </Pressable>
+                </View>
               </View>
               {recentLogs.map((log) => (
                 <Pressable key={log.id} style={styles.logCard} onPress={() => setDetailLog(log)}>
@@ -448,12 +446,6 @@ export default function HomeScreen() {
                 <Text style={styles.resultLabel}>時間</Text>
                 <Text style={styles.resultValue}>{new Date(detailLog.capturedAt).toLocaleString('zh-TW')}</Text>
               </View>
-              {detailLog.bristolScore ? (
-                <View style={styles.resultRow}>
-                  <Text style={styles.resultLabel}>Bristol 評分</Text>
-                  <Text style={styles.resultValue}>{detailLog.bristolScore} / 7</Text>
-                </View>
-              ) : null}
             </View>
 
             <View style={styles.modalActions}>
@@ -651,6 +643,16 @@ const styles = StyleSheet.create({
     color: '#171d1c',
     fontSize: 17,
     fontWeight: '700',
+  },
+  logsSectionRight: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10,
+  },
+  viewAllText: {
+    color: '#20B2AA',
+    fontSize: 14,
+    fontWeight: '600',
   },
   logCard: {
     backgroundColor: '#f5fbf9',

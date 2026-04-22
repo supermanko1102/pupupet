@@ -19,6 +19,7 @@ export default function RootLayout() {
         <Stack>
           <Stack.Screen name="sign-in" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="history" options={{ title: '歷史紀錄', headerBackTitle: '返回' }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: '關於 PupuPet' }} />
         </Stack>
         <StatusBar style="auto" />
