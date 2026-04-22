@@ -19,6 +19,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 import { SettingsPanel } from '@/components/settings-panel';
+import { StatsPanel } from '@/components/stats-panel';
+
+type ActiveTab = 'scan' | 'stats';
 
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -49,6 +52,7 @@ export default function HomeScreen() {
   const [pets, setPets] = useState<Pet[]>([]);
   const [selectedPetId, setSelectedPetId] = useState<string | null>(null);
   const [recentLogs, setRecentLogs] = useState<RecentLog[]>([]);
+  const [activeTab, setActiveTab] = useState<ActiveTab>('scan');
   const [menuOpen, setMenuOpen] = useState(false);
   const iconAnim = useRef(new Animated.Value(0)).current;
 
@@ -342,19 +346,24 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
-        {/* Content area */}
-        <View style={styles.contentArea}>
-          {/* Main Content */}
-          <ScrollView
-            style={styles.scroll}
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-            refreshControl={
-              <RefreshControl
-                refreshing={isRefreshing}
-                onRefresh={() => (user ? void loadDashboard(true) : undefined)}
-              />
-            }>
+        {/* Content + Tab Bar */}
+        <View style={styles.bodyWrap}>
+          <View style={styles.contentArea}>
+            {/* 統計 tab */}
+            {activeTab === 'stats' && <StatsPanel />}
+
+            {/* 掃描 tab */}
+            {activeTab === 'scan' && (
+            <ScrollView
+              style={styles.scroll}
+              contentContainerStyle={styles.scrollContent}
+              showsVerticalScrollIndicator={false}
+              refreshControl={
+                <RefreshControl
+                  refreshing={isRefreshing}
+                  onRefresh={() => (user ? void loadDashboard(true) : undefined)}
+                />
+              }>
           {/* Hero Text */}
           <View style={styles.heroSection}>
             <Text style={styles.heroTitle}>準備好健康檢查了嗎？</Text>
@@ -429,14 +438,28 @@ export default function HomeScreen() {
               <Text style={styles.emptyText}>還沒有紀錄，點上方按鈕開始第一次掃描。</Text>
             </View>
           )}
-          </ScrollView>
+            </ScrollView>
+            )}
 
-          {/* Settings overlay */}
-          {menuOpen && (
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: '#ffffff' }]}>
-              <SettingsPanel />
-            </View>
-          )}
+            {/* Settings overlay — covers content area only */}
+            {menuOpen && (
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: '#ffffff' }]}>
+                <SettingsPanel />
+              </View>
+            )}
+          </View>
+
+          {/* Custom Tab Bar */}
+          <View style={styles.tabBar}>
+            <Pressable style={styles.tabItem} onPress={() => setActiveTab('scan')}>
+              <Ionicons name="camera" size={22} color={activeTab === 'scan' ? '#20B2AA' : '#bbc9c7'} />
+              <Text style={[styles.tabLabel, activeTab === 'scan' && styles.tabLabelActive]}>掃描</Text>
+            </Pressable>
+            <Pressable style={styles.tabItem} onPress={() => setActiveTab('stats')}>
+              <Ionicons name="bar-chart" size={22} color={activeTab === 'stats' ? '#20B2AA' : '#bbc9c7'} />
+              <Text style={[styles.tabLabel, activeTab === 'stats' && styles.tabLabelActive]}>統計</Text>
+            </Pressable>
+          </View>
         </View>
 
       </SafeAreaView>
@@ -565,9 +588,33 @@ const styles = StyleSheet.create({
     height: 26,
     width: 26,
   },
+  bodyWrap: {
+    flex: 1,
+  },
   contentArea: {
     flex: 1,
     overflow: 'hidden',
+  },
+  tabBar: {
+    backgroundColor: '#ffffff',
+    borderTopColor: '#e3e9e8',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+  },
+  tabItem: {
+    alignItems: 'center',
+    flex: 1,
+    gap: 3,
+    paddingBottom: 8,
+    paddingTop: 10,
+  },
+  tabLabel: {
+    color: '#bbc9c7',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  tabLabelActive: {
+    color: '#20B2AA',
   },
   brandName: {
     color: '#20B2AA',
