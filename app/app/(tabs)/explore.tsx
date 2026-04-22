@@ -1,192 +1,260 @@
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Fonts } from '@/constants/theme';
-import { env, isSupabaseConfigured } from '@/lib/env';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/providers/session-provider';
+import type { Database } from '@/types/database';
 
-export default function SetupScreen() {
-  const { authError, user } = useSession();
+type Pet = Database['public']['Tables']['pets']['Row'];
+
+export default function SettingsScreen() {
+  const { user } = useSession();
+  const [pet, setPet] = useState<Pet | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const [name, setName] = useState('');
+  const [breed, setBreed] = useState('');
+  const [weightKg, setWeightKg] = useState('');
+
+  const loadPet = useCallback(async () => {
+    if (!supabase || !user) return;
+    setIsLoading(true);
+    const { data } = await supabase
+      .from('pets')
+      .select('*')
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .single();
+
+    if (data) {
+      setPet(data);
+      setName(data.name);
+      setBreed(data.breed ?? '');
+      setWeightKg(data.weight_kg ? String(data.weight_kg) : '');
+    }
+    setIsLoading(false);
+  }, [user]);
+
+  useEffect(() => {
+    void loadPet();
+  }, [loadPet]);
+
+  async function savePet() {
+    if (!supabase || !user || !name.trim()) return;
+    setIsSaving(true);
+
+    const fields = {
+      name: name.trim(),
+      breed: breed.trim() || null,
+      weight_kg: weightKg ? parseFloat(weightKg) : null,
+    };
+
+    try {
+      if (pet) {
+        const { error } = await supabase.from('pets').update(fields).eq('id', pet.id);
+        if (error) throw error;
+      } else {
+        const { data, error } = await supabase
+          .from('pets')
+          .insert({ ...fields, species: 'dog' })
+          .select()
+          .single();
+        if (error) throw error;
+        setPet(data);
+      }
+      Alert.alert('儲存成功', '寵物資料已更新。');
+    } catch (err) {
+      Alert.alert('儲存失敗', err instanceof Error ? err.message : '請稍後再試。');
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function signOut() {
+    Alert.alert('登出', '確定要登出嗎？', [
+      { text: '取消', style: 'cancel' },
+      {
+        text: '登出',
+        style: 'destructive',
+        onPress: () => void supabase?.auth.signOut(),
+      },
+    ]);
+  }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <ThemedView style={[styles.card, styles.hero]}>
-        <ThemedText style={styles.eyebrow}>Supabase Setup</ThemedText>
-        <ThemedText type="title" style={[styles.title, { fontFamily: Fonts.rounded }]}>
-          下一步把 AI 分析串進來
-        </ThemedText>
-        <ThemedText style={styles.body}>
-          目前 app 已經完成 Apple 登入、建立寵物、圖片上傳與 poop log 寫入。接下來只差把分析 worker
-          接到 `uploaded` 紀錄上。
-        </ThemedText>
-      </ThemedView>
+    <SafeAreaView style={styles.screen}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <Text style={styles.pageTitle}>設定</Text>
 
-      <ThemedView style={styles.card}>
-        <ThemedText type="subtitle">目前狀態</ThemedText>
-        <Item label="Env" value={isSupabaseConfigured ? '已設定' : '未設定'} />
-        <Item label="Apple Auth" value={authError ? '設定未完成' : '可登入'} />
-        <Item label="Current User" value={user?.id ?? '尚未登入'} />
-        <Item label="Project URL" value={env.supabaseUrl || '請填 EXPO_PUBLIC_SUPABASE_URL'} />
-        {user ? (
-          <Pressable style={styles.signOutButton} onPress={() => void supabase?.auth.signOut()}>
-            <ThemedText style={styles.signOutText}>登出</ThemedText>
+        {/* 寵物資料 */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>寵物資料</Text>
+
+          {isLoading ? (
+            <ActivityIndicator color="#20B2AA" style={{ marginVertical: 20 }} />
+          ) : (
+            <View style={styles.form}>
+              <View style={styles.field}>
+                <Text style={styles.fieldLabel}>名字</Text>
+                <TextInput
+                  style={styles.input}
+                  value={name}
+                  onChangeText={setName}
+                  placeholder="例如：小白"
+                  placeholderTextColor="#bbc9c7"
+                />
+              </View>
+
+              <View style={styles.field}>
+                <Text style={styles.fieldLabel}>品種</Text>
+                <TextInput
+                  style={styles.input}
+                  value={breed}
+                  onChangeText={setBreed}
+                  placeholder="例如：柴犬"
+                  placeholderTextColor="#bbc9c7"
+                />
+              </View>
+
+              <View style={styles.field}>
+                <Text style={styles.fieldLabel}>體重（kg）</Text>
+                <TextInput
+                  style={styles.input}
+                  value={weightKg}
+                  onChangeText={setWeightKg}
+                  placeholder="例如：5.2"
+                  placeholderTextColor="#bbc9c7"
+                  keyboardType="decimal-pad"
+                />
+              </View>
+
+              <Pressable
+                style={[styles.saveButton, isSaving && { opacity: 0.6 }]}
+                onPress={() => void savePet()}
+                disabled={isSaving || !name.trim()}>
+                {isSaving
+                  ? <ActivityIndicator color="#ffffff" />
+                  : <Text style={styles.saveButtonText}>儲存</Text>}
+              </Pressable>
+            </View>
+          )}
+        </View>
+
+        {/* 帳號 */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>帳號</Text>
+          <View style={styles.accountRow}>
+            <Ionicons name="person-circle-outline" size={20} color="#6c7a78" />
+            <Text style={styles.accountEmail} numberOfLines={1}>{user?.email ?? '已登入'}</Text>
+          </View>
+          <Pressable style={styles.signOutButton} onPress={() => void signOut()}>
+            <Ionicons name="log-out-outline" size={18} color="#9a3412" />
+            <Text style={styles.signOutText}>登出</Text>
           </Pressable>
-        ) : null}
-      </ThemedView>
-
-      <ThemedView style={styles.card}>
-        <ThemedText type="subtitle">你現在要做的事</ThemedText>
-        <ChecklistStep
-          number="01"
-          title="貼上環境變數"
-          body="把 .env.example 複製成 .env，填入 EXPO_PUBLIC_SUPABASE_URL 與 EXPO_PUBLIC_SUPABASE_ANON_KEY。"
-        />
-        <ChecklistStep
-          number="02"
-          title="執行 schema.sql"
-          body="到 Supabase SQL Editor 執行 app/supabase/schema.sql，建立 tables、bucket 與 RLS。"
-        />
-        <ChecklistStep
-          number="03"
-          title="設定 Apple Provider"
-          body="到 Supabase Auth > Sign In / Providers 開啟 Apple，填 Apple Developer Console 的設定。原生 iOS 走的是 Apple credential + Supabase signInWithIdToken。"
-        />
-        <ChecklistStep
-          number="04"
-          title="做一個 iOS build"
-          body="app.json 已經加上 usesAppleSignIn 與 expo-apple-authentication。接下來用 EAS Build 或 expo run:ios 測試，不要只靠 web。"
-        />
-      </ThemedView>
-
-      <ThemedView style={styles.card}>
-        <ThemedText type="subtitle">建議的下一個資料流</ThemedText>
-        <ThemedText style={styles.body}>
-          {'upload -> poop_logs.status = uploaded -> Edge Function 撈待分析紀錄 -> 呼叫 Vision model -> update poop_logs(done)'}
-        </ThemedText>
-        <ThemedText style={styles.note}>
-          先別把 AI 直接放在 App 端呼叫。模型金鑰應該留在 server 端。
-        </ThemedText>
-      </ThemedView>
-    </ScrollView>
-  );
-}
-
-function Item({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.itemRow}>
-      <ThemedText style={styles.label}>{label}</ThemedText>
-      <ThemedText style={styles.value}>{value}</ThemedText>
-    </View>
-  );
-}
-
-function ChecklistStep({
-  body,
-  number,
-  title,
-}: {
-  body: string;
-  number: string;
-  title: string;
-}) {
-  return (
-    <View style={styles.stepRow}>
-      <View style={styles.stepBadge}>
-        <ThemedText style={styles.stepBadgeText}>{number}</ThemedText>
-      </View>
-      <View style={styles.stepContent}>
-        <ThemedText type="defaultSemiBold">{title}</ThemedText>
-        <ThemedText style={styles.body}>{body}</ThemedText>
-      </View>
-    </View>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  body: {
-    color: '#594D43',
-    marginTop: 8,
+  screen: {
+    backgroundColor: '#ffffff',
+    flex: 1,
   },
-  card: {
-    borderRadius: 28,
-    marginHorizontal: 16,
-    marginTop: 16,
+  content: {
+    padding: 24,
+    gap: 24,
+  },
+  pageTitle: {
+    color: '#171d1c',
+    fontSize: 28,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  section: {
+    backgroundColor: '#f5fbf9',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#e3e9e8',
     padding: 20,
+    gap: 16,
   },
-  container: {
-    backgroundColor: '#F7F1E8',
-    paddingBottom: 40,
-    paddingTop: 20,
-  },
-  eyebrow: {
-    color: '#7A3B00',
+  sectionTitle: {
+    color: '#6c7a78',
     fontSize: 13,
     fontWeight: '700',
-    letterSpacing: 1,
+    letterSpacing: 0.8,
     textTransform: 'uppercase',
   },
-  hero: {
-    backgroundColor: '#DDECD8',
+  form: {
+    gap: 14,
   },
-  itemRow: {
-    borderBottomColor: '#E6DCCE',
-    borderBottomWidth: 1,
+  field: {
     gap: 6,
-    paddingVertical: 12,
   },
-  label: {
-    color: '#6A5E55',
-    fontSize: 13,
-    textTransform: 'uppercase',
+  fieldLabel: {
+    color: '#3c4948',
+    fontSize: 14,
+    fontWeight: '600',
   },
-  note: {
-    color: '#8A3B12',
-    marginTop: 12,
+  input: {
+    backgroundColor: '#ffffff',
+    borderColor: '#bbc9c7',
+    borderRadius: 12,
+    borderWidth: 1,
+    color: '#171d1c',
+    fontSize: 16,
+    height: 48,
+    paddingHorizontal: 14,
+  },
+  saveButton: {
+    alignItems: 'center',
+    backgroundColor: '#20B2AA',
+    borderRadius: 14,
+    height: 50,
+    justifyContent: 'center',
+    marginTop: 4,
+  },
+  saveButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  accountRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10,
+  },
+  accountEmail: {
+    color: '#3c4948',
+    flex: 1,
+    fontSize: 15,
   },
   signOutButton: {
     alignItems: 'center',
-    backgroundColor: '#1F1A14',
+    backgroundColor: '#fde8e8',
     borderRadius: 14,
+    flexDirection: 'row',
+    gap: 8,
+    height: 50,
     justifyContent: 'center',
-    marginTop: 16,
-    minHeight: 46,
   },
   signOutText: {
-    color: '#FFF9F0',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  stepBadge: {
-    alignItems: 'center',
-    backgroundColor: '#F2D6B3',
-    borderRadius: 999,
-    height: 40,
-    justifyContent: 'center',
-    width: 40,
-  },
-  stepBadgeText: {
-    color: '#7A3B00',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  stepContent: {
-    flex: 1,
-  },
-  stepRow: {
-    flexDirection: 'row',
-    gap: 14,
-    marginTop: 16,
-  },
-  title: {
-    fontSize: 34,
-    lineHeight: 40,
-    marginTop: 8,
-  },
-  value: {
-    color: '#1F1A14',
-    fontSize: 15,
-    lineHeight: 22,
+    color: '#9a3412',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

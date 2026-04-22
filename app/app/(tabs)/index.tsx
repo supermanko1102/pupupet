@@ -56,8 +56,10 @@ export default function HomeScreen() {
     riskLevel: RiskLevel;
     summary: string | null;
     recommendation: string | null;
+    failed?: boolean;
   } | null>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [detailLog, setDetailLog] = useState<RecentLog | null>(null);
 
   const loadDashboard = useCallback(
     async (isPullToRefresh = false) => {
@@ -138,45 +140,59 @@ export default function HomeScreen() {
     return data.id;
   }
 
-  async function startScan() {
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert('需要相機權限', '請先允許 App 使用相機。');
-      return;
-    }
-
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ['images'],
-      quality: 0.85,
-      allowsEditing: true,
-      aspect: [4, 3],
-    });
-
-    if (result.canceled || !result.assets[0]) return;
-    setCapturedAsset(result.assets[0]);
-  }
-
-  async function confirmUpload() {
-    if (!capturedAsset || !supabase || !user) return;
-
+  async function uploadAsset(asset: ImagePicker.ImagePickerAsset) {
+    if (!supabase || !user) return;
+    setCapturedAsset(asset);
+    setModalPhase('analyzing');
     setIsUploading(true);
     try {
       const petId = await ensureDefaultPet();
-      const imagePath = await uploadPoopPhoto(user.id, capturedAsset);
+      const imagePath = await uploadPoopPhoto(user.id, asset);
       const { data: newLog, error } = await supabase
         .from('poop_logs')
         .insert({ pet_id: petId, image_path: imagePath, status: 'uploaded' })
         .select('id, image_path')
         .single();
       if (error) throw error;
-
-      setModalPhase('analyzing');
       startPolling(newLog.id, newLog.image_path);
     } catch (err) {
       Alert.alert('上傳失敗', err instanceof Error ? err.message : '請稍後再試。');
+      closeModal();
     } finally {
       setIsUploading(false);
     }
+  }
+
+  async function startScan() {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('需要相機權限', '請先允許 App 使用相機。');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images'],
+      quality: 0.85,
+      allowsEditing: true,
+      aspect: [4, 3],
+    });
+    if (result.canceled || !result.assets[0]) return;
+    void uploadAsset(result.assets[0]);
+  }
+
+  async function pickFromLibrary() {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('需要相簿權限', '請先允許 App 存取相簿。');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.85,
+      allowsEditing: true,
+      aspect: [4, 3],
+    });
+    if (result.canceled || !result.assets[0]) return;
+    void uploadAsset(result.assets[0]);
   }
 
   function startPolling(logId: string, imagePath: string) {
@@ -202,9 +218,10 @@ export default function HomeScreen() {
         setAnalysisResult({
           imageUrl: signedData?.signedUrl ?? '',
           bristolScore: data.bristol_score,
-          riskLevel: data.risk_level,
-          summary: data.summary,
-          recommendation: data.recommendation,
+          riskLevel: data.status === 'failed' ? null : data.risk_level,
+          summary: data.status === 'failed' ? '分析失敗，請重新拍照。' : data.summary,
+          recommendation: data.status === 'failed' ? null : data.recommendation,
+          failed: data.status === 'failed',
         });
         setModalPhase('result');
         void loadDashboard();
@@ -226,35 +243,7 @@ export default function HomeScreen() {
     <Modal visible={!!capturedAsset} animationType="slide" presentationStyle="pageSheet">
       <SafeAreaView style={styles.modalSafe}>
 
-        {/* 階段一：預覽確認 */}
-        {modalPhase === 'preview' && (
-          <>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>確認上傳</Text>
-            </View>
-            {capturedAsset && (
-              <Image source={{ uri: capturedAsset.uri }} style={styles.modalPreview} contentFit="cover" />
-            )}
-            <View style={styles.modalActions}>
-              <Pressable
-                style={[styles.modalButton, styles.uploadButton, isUploading && { opacity: 0.6 }]}
-                onPress={() => void confirmUpload()}
-                disabled={isUploading}>
-                {isUploading
-                  ? <ActivityIndicator color="#ffffff" />
-                  : <Text style={styles.uploadButtonText}>上傳分析</Text>}
-              </Pressable>
-              <Pressable
-                style={[styles.modalButton, styles.retakeButton]}
-                onPress={closeModal}
-                disabled={isUploading}>
-                <Text style={styles.retakeButtonText}>重拍</Text>
-              </Pressable>
-            </View>
-          </>
-        )}
-
-        {/* 階段二：分析中 */}
+        {/* 分析中 */}
         {modalPhase === 'analyzing' && (
           <View style={styles.analyzingContainer}>
             {capturedAsset && (
@@ -277,13 +266,13 @@ export default function HomeScreen() {
 
             <View style={styles.resultBody}>
               {/* 風險等級 */}
-              <View style={[styles.riskBanner, riskBannerStyle(analysisResult.riskLevel)]}>
-                <Text style={[styles.riskBannerIcon]}>{riskIcon(analysisResult.riskLevel)}</Text>
-                <View>
-                  <Text style={[styles.riskBannerTitle, { color: riskBannerStyle(analysisResult.riskLevel).textColor }]}>
-                    {riskTitle(analysisResult.riskLevel)}
+              <View style={[styles.riskBanner, riskBannerStyle(analysisResult.failed ? null : analysisResult.riskLevel)]}>
+                <Text style={styles.riskBannerIcon}>{analysisResult.failed ? '❌' : riskIcon(analysisResult.riskLevel)}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.riskBannerTitle, { color: riskBannerStyle(analysisResult.failed ? null : analysisResult.riskLevel).textColor }]}>
+                    {analysisResult.failed ? '分析失敗' : riskTitle(analysisResult.riskLevel)}
                   </Text>
-                  <Text style={[styles.riskBannerSub, { color: riskBannerStyle(analysisResult.riskLevel).textColor }]}>
+                  <Text style={[styles.riskBannerSub, { color: riskBannerStyle(analysisResult.failed ? null : analysisResult.riskLevel).textColor }]}>
                     {analysisResult.summary ?? ''}
                   </Text>
                 </View>
@@ -376,6 +365,13 @@ export default function HomeScreen() {
                 </>
               )}
             </Pressable>
+            <Pressable
+              style={styles.libraryButton}
+              onPress={() => void pickFromLibrary()}
+              disabled={isUploading || !user}>
+              <Ionicons name="images-outline" size={18} color="#6c7a78" />
+              <Text style={styles.libraryButtonText}>從相簿選擇</Text>
+            </Pressable>
           </View>
 
           {/* Recent Logs */}
@@ -386,7 +382,7 @@ export default function HomeScreen() {
                 {isLoading && <ActivityIndicator size="small" color={palette.tint} />}
               </View>
               {recentLogs.map((log) => (
-                <View key={log.id} style={styles.logCard}>
+                <Pressable key={log.id} style={styles.logCard} onPress={() => setDetailLog(log)}>
                   {log.imageUrl ? (
                     <Image source={{ uri: log.imageUrl }} style={styles.logImage} contentFit="cover" />
                   ) : (
@@ -406,7 +402,7 @@ export default function HomeScreen() {
                       <Text style={styles.logSummary} numberOfLines={2}>{log.summary}</Text>
                     ) : null}
                   </View>
-                </View>
+                </Pressable>
               ))}
             </View>
           )}
@@ -420,6 +416,55 @@ export default function HomeScreen() {
         </ScrollView>
       </SafeAreaView>
     </LinearGradient>
+
+    {/* 歷史記錄詳細 Modal */}
+    <Modal visible={!!detailLog} animationType="slide" presentationStyle="pageSheet">
+      <SafeAreaView style={styles.modalSafe}>
+        {detailLog && (
+          <ScrollView style={styles.resultScroll} contentContainerStyle={styles.resultContent}>
+            {detailLog.imageUrl ? (
+              <Image source={{ uri: detailLog.imageUrl }} style={styles.resultImage} contentFit="cover" />
+            ) : null}
+            <View style={styles.resultBody}>
+              <View style={[styles.riskBanner, riskBannerStyle(detailLog.riskLevel)]}>
+                <Text style={styles.riskBannerIcon}>{riskIcon(detailLog.riskLevel)}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.riskBannerTitle, { color: riskBannerStyle(detailLog.riskLevel).textColor }]}>
+                    {riskTitle(detailLog.riskLevel)}
+                  </Text>
+                  {detailLog.summary ? (
+                    <Text style={[styles.riskBannerSub, { color: riskBannerStyle(detailLog.riskLevel).textColor }]}>
+                      {detailLog.summary}
+                    </Text>
+                  ) : null}
+                </View>
+              </View>
+
+              <View style={styles.resultRow}>
+                <Text style={styles.resultLabel}>寵物</Text>
+                <Text style={styles.resultValue}>{detailLog.petName}</Text>
+              </View>
+              <View style={styles.resultRow}>
+                <Text style={styles.resultLabel}>時間</Text>
+                <Text style={styles.resultValue}>{new Date(detailLog.capturedAt).toLocaleString('zh-TW')}</Text>
+              </View>
+              {detailLog.bristolScore ? (
+                <View style={styles.resultRow}>
+                  <Text style={styles.resultLabel}>Bristol 評分</Text>
+                  <Text style={styles.resultValue}>{detailLog.bristolScore} / 7</Text>
+                </View>
+              ) : null}
+            </View>
+
+            <View style={styles.modalActions}>
+              <Pressable style={[styles.modalButton, styles.uploadButton]} onPress={() => setDetailLog(null)}>
+                <Text style={styles.uploadButtonText}>關閉</Text>
+              </Pressable>
+            </View>
+          </ScrollView>
+        )}
+      </SafeAreaView>
+    </Modal>
     </>
   );
 }
@@ -578,6 +623,18 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     letterSpacing: 0.5,
+  },
+  libraryButton: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 20,
+    paddingVertical: 8,
+  },
+  libraryButtonText: {
+    color: '#6c7a78',
+    fontSize: 15,
+    fontWeight: '500',
   },
   logsSection: {
     gap: 12,
