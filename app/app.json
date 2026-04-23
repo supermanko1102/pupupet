@@ -38,6 +38,14 @@
       "expo-router",
       "expo-apple-authentication",
       [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#20B2AA",
+          "sounds": []
+        }
+      ],
+      [
         "expo-image-picker",
         {
           "photosPermission": "讓 PupuPet 存取相簿以上傳寵物便便照片。"
