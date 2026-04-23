@@ -1,8 +1,7 @@
 import { Image } from 'expo-image';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Pressable,
   RefreshControl,
@@ -26,157 +25,64 @@ import {
   riskTitle,
 } from '@/lib/log-utils';
 import { StatusPill } from '@/components/status-pill';
-import { supabase } from '@/lib/supabase';
-import { useTrendSummary } from '@/hooks/use-poop-logs';
-import { useSession } from '@/providers/session-provider';
-import type { Database } from '@/types/database';
-
-type RiskLevel = Database['public']['Tables']['poop_logs']['Row']['risk_level'];
-type ManualStatus = Database['public']['Tables']['poop_logs']['Row']['manual_status'];
-type Pet = Database['public']['Tables']['pets']['Row'];
-
-type LogItem = {
-  capturedAt: string;
-  entryMode: 'quick_log' | 'photo_ai';
-  id: string;
-  imagePath: string | null;
-  imageUrl: string | null;
-  manualStatus: ManualStatus;
-  note: string | null;
-  petId: string | null;
-  petName: string;
-  recommendation: string | null;
-  riskLevel: RiskLevel;
-  status: string;
-  summary: string | null;
-};
+import { useAssignPet, usePets } from '@/hooks/use-pets';
+import { useHistoryLogs, useTrendSummary, type HistoryLog } from '@/hooks/use-poop-logs';
 
 type Section = {
-  data: LogItem[];
+  data: HistoryLog[];
   title: string;
 };
 
-const PAGE_SIZE = 20;
-
 export default function HistoryScreen() {
-  const { user } = useSession();
-  const [logs, setLogs] = useState<LogItem[]>([]);
-  const [pets, setPets] = useState<Pet[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
-  const [detailLog, setDetailLog] = useState<LogItem | null>(null);
-  const [isAssigning, setIsAssigning] = useState(false);
-  const offsetRef = useRef(0);
+  const [detailLog, setDetailLog] = useState<HistoryLog | null>(null);
 
+  const {
+    data,
+    isLoading,
+    isRefetching,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+    refetch,
+    error,
+  } = useHistoryLogs();
+
+  const { data: pets = [] } = usePets();
+  const assignPetMutation = useAssignPet();
   const { data: trendSummary } = useTrendSummary();
 
-  const fetchLogs = useCallback(
-    async (offset: number, isPullToRefresh = false) => {
-      if (!supabase || !user) return;
-
-      if (isPullToRefresh) {
-        setIsRefreshing(true);
-      } else if (offset === 0) {
-        setIsLoading(true);
-      } else {
-        setIsLoadingMore(true);
-      }
-
-      const { data: rows } = await supabase
-        .from('poop_logs')
-        .select('id, captured_at, image_path, status, summary, recommendation, risk_level, pet_id, entry_mode, manual_status, note, pets(name)')
-        .order('captured_at', { ascending: false })
-        .range(offset, offset + PAGE_SIZE - 1);
-
-      const items: LogItem[] = await Promise.all(
-        (rows ?? []).map(async (row) => {
-          const petName =
-            row.pets && typeof row.pets === 'object' && 'name' in row.pets
-              ? (row.pets as { name: string }).name
-              : '未分類';
-
-          let imageUrl: string | null = null;
-          if (row.image_path) {
-            const { data: signedData } = await supabase!.storage
-              .from('poop-photos')
-              .createSignedUrl(row.image_path, 60 * 60);
-            imageUrl = signedData?.signedUrl ?? null;
-          }
-
-          return {
-            capturedAt: row.captured_at,
-            entryMode: (row.entry_mode ?? 'photo_ai') as 'quick_log' | 'photo_ai',
-            id: row.id,
-            imagePath: row.image_path ?? null,
-            imageUrl,
-            manualStatus: row.manual_status as ManualStatus,
-            note: row.note ?? null,
-            petId: row.pet_id ?? null,
-            petName,
-            recommendation: row.recommendation,
-            riskLevel: row.risk_level,
-            status: row.status,
-            summary: row.summary,
-          };
-        })
-      );
-
-      if (isPullToRefresh || offset === 0) {
-        setLogs(items);
-      } else {
-        setLogs((prev) => [...prev, ...items]);
-      }
-
-      setHasMore(items.length === PAGE_SIZE);
-      offsetRef.current = offset + items.length;
-      setIsLoading(false);
-      setIsRefreshing(false);
-      setIsLoadingMore(false);
-    },
-    [user]
-  );
-
-  useEffect(() => {
-    offsetRef.current = 0;
-    void fetchLogs(0);
-    if (supabase && user) {
-      void supabase.from('pets').select('*').order('created_at', { ascending: true }).then(({ data }) => {
-        setPets(data ?? []);
-      });
-    }
-  }, [fetchLogs, user]);
+  const logs = data?.pages.flat() ?? [];
+  const sections = buildSections(logs);
 
   async function assignPet(logId: string, petId: string) {
-    if (!supabase) return;
-    setIsAssigning(true);
-    const { error } = await supabase.from('poop_logs').update({ pet_id: petId }).eq('id', logId);
-    setIsAssigning(false);
-    if (error) { Alert.alert('指定失敗', error.message); return; }
+    await assignPetMutation.mutateAsync({ logId, petId });
     const pet = pets.find((p) => p.id === petId);
-    setDetailLog((prev) => prev ? { ...prev, petId, petName: pet?.name ?? prev.petName } : prev);
-    setLogs((prev) => prev.map((l) => l.id === logId ? { ...l, petId, petName: pet?.name ?? l.petName } : l));
-  }
-
-  function handleRefresh() {
-    offsetRef.current = 0;
-    setHasMore(true);
-    void fetchLogs(0, true);
+    setDetailLog((prev) =>
+      prev ? { ...prev, petId, petName: pet?.name ?? prev.petName } : prev
+    );
   }
 
   function handleLoadMore() {
-    if (isLoadingMore || !hasMore) return;
-    void fetchLogs(offsetRef.current);
+    if (isFetchingNextPage || !hasNextPage) return;
+    void fetchNextPage();
   }
-
-  const sections = buildSections(logs);
 
   if (isLoading) {
     return (
       <SafeAreaView style={styles.screen} edges={['bottom']}>
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#20B2AA" />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={styles.screen} edges={['bottom']}>
+        <View style={styles.centered}>
+          <Ionicons name="alert-circle-outline" size={40} color="#fca5a5" />
+          <Text style={styles.errorText}>載入失敗，請下拉重試</Text>
         </View>
       </SafeAreaView>
     );
@@ -199,8 +105,8 @@ export default function HistoryScreen() {
           contentContainerStyle={logs.length === 0 ? styles.emptyContainer : styles.listContent}
           refreshControl={
             <RefreshControl
-              refreshing={isRefreshing}
-              onRefresh={handleRefresh}
+              refreshing={isRefetching && !isFetchingNextPage}
+              onRefresh={() => void refetch()}
               tintColor="#20B2AA"
             />
           }
@@ -235,7 +141,7 @@ export default function HistoryScreen() {
             </View>
           }
           ListFooterComponent={
-            isLoadingMore ? (
+            isFetchingNextPage ? (
               <View style={styles.footer}>
                 <ActivityIndicator size="small" color="#20B2AA" />
               </View>
@@ -307,7 +213,7 @@ export default function HistoryScreen() {
                           <Pressable
                             key={pet.id}
                             style={styles.petPickerButton}
-                            disabled={isAssigning}
+                            disabled={assignPetMutation.isPending}
                             onPress={() => void assignPet(detailLog.id, pet.id)}>
                             <Text style={styles.petPickerEmoji}>
                               {pet.species === 'dog' ? '🐶' : pet.species === 'cat' ? '🐱' : '🐾'}
@@ -343,7 +249,7 @@ export default function HistoryScreen() {
 
 // ─── LogCard ──────────────────────────────────────────────────────────────────
 
-function LogCard({ log, onPress }: { log: LogItem; onPress: () => void }) {
+function LogCard({ log, onPress }: { log: HistoryLog; onPress: () => void }) {
   return (
     <Pressable style={styles.card} onPress={onPress}>
       {log.entryMode === 'quick_log' ? (
@@ -375,18 +281,17 @@ function LogCard({ log, onPress }: { log: LogItem; onPress: () => void }) {
   );
 }
 
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function buildSections(logs: LogItem[]): Section[] {
+function buildSections(logs: HistoryLog[]): Section[] {
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const weekStart = new Date(todayStart);
   weekStart.setDate(weekStart.getDate() - 6);
 
-  const today: LogItem[] = [];
-  const thisWeek: LogItem[] = [];
-  const earlier: LogItem[] = [];
+  const today: HistoryLog[] = [];
+  const thisWeek: HistoryLog[] = [];
+  const earlier: HistoryLog[] = [];
 
   for (const log of logs) {
     const d = new Date(log.capturedAt);
@@ -402,12 +307,12 @@ function buildSections(logs: LogItem[]): Section[] {
   return sections;
 }
 
-
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   screen: { backgroundColor: '#ffffff', flex: 1 },
-  centered: { alignItems: 'center', flex: 1, justifyContent: 'center' },
+  centered: { alignItems: 'center', flex: 1, gap: 12, justifyContent: 'center' },
+  errorText: { color: '#6c7a78', fontSize: 15, textAlign: 'center' },
   listContent: { paddingBottom: 32, paddingTop: 8 },
   emptyContainer: { flex: 1 },
 
@@ -470,7 +375,6 @@ const styles = StyleSheet.create({
   cardPetName: { color: '#171d1c', fontSize: 15, fontWeight: '600' },
   cardDate: { color: '#6c7a78', fontSize: 12 },
   cardSummary: { color: '#3c4948', fontSize: 13, lineHeight: 18, marginTop: 2 },
-
 
   // Empty
   emptyState: {

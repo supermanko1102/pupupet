@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { scheduleAbnormalFollowUp } from '@/lib/notifications';
 import { supabase } from '@/lib/supabase';
@@ -9,6 +9,38 @@ type RiskLevel = Database['public']['Tables']['poop_logs']['Row']['risk_level'];
 type ManualStatus = Database['public']['Tables']['poop_logs']['Row']['manual_status'];
 
 export const POOP_LOGS_KEY = 'poop_logs';
+export const HISTORY_PAGE_SIZE = 20;
+
+// ─── Shared helper ─────────────────────────────────────────────────────────────
+
+function effectiveRisk(row: { entry_mode: string; risk_level: RiskLevel; manual_status: ManualStatus }): RiskLevel {
+  if (row.entry_mode === 'photo_ai') return row.risk_level;
+  switch (row.manual_status) {
+    case 'normal': return 'normal';
+    case 'soft':
+    case 'hard': return 'observe';
+    case 'abnormal': return 'vet';
+    default: return null;
+  }
+}
+
+// ─── Batch signed URL helper ───────────────────────────────────────────────────
+
+async function batchSignedUrls(paths: (string | null)[]): Promise<Map<string, string>> {
+  const validPaths = paths.filter((p): p is string => !!p);
+  if (!supabase || validPaths.length === 0) return new Map();
+
+  const { data } = await supabase.storage
+    .from('poop-photos')
+    .createSignedUrls(validPaths, 60 * 60);
+
+  const map = new Map<string, string>();
+  for (const entry of data ?? []) {
+    const { path, signedUrl } = entry;
+    if (path && signedUrl) map.set(path, signedUrl);
+  }
+  return map;
+}
 
 // ─── 首頁最近紀錄（8 筆，含 signed URL）────────────────────────────────────────
 
@@ -42,39 +74,101 @@ export function useRecentLogs() {
 
       if (error) throw error;
 
-      return Promise.all(
-        (rows ?? []).map(async (row) => {
-          const petName =
-            row.pets && typeof row.pets === 'object' && 'name' in row.pets
-              ? row.pets.name
-              : '未分類';
+      const signedUrlMap = await batchSignedUrls((rows ?? []).map((r) => r.image_path));
 
-          let imageUrl: string | null = null;
-          if (row.image_path) {
-            const { data: signed } = await supabase!.storage
-              .from('poop-photos')
-              .createSignedUrl(row.image_path, 60 * 60);
-            imageUrl = signed?.signedUrl ?? null;
-          }
+      return (rows ?? []).map((row): RecentLog => {
+        const petName =
+          row.pets && typeof row.pets === 'object' && 'name' in row.pets
+            ? row.pets.name
+            : '未分類';
 
-          return {
-            bristolScore: row.bristol_score,
-            capturedAt: row.captured_at,
-            entryMode: row.entry_mode as 'quick_log' | 'photo_ai',
-            id: row.id,
-            imageUrl,
-            manualStatus: row.manual_status as ManualStatus,
-            note: row.note,
-            petName,
-            riskLevel: row.risk_level,
-            status: row.status,
-            summary: row.summary,
-          } satisfies RecentLog;
-        })
-      );
+        return {
+          bristolScore: row.bristol_score,
+          capturedAt: row.captured_at,
+          entryMode: row.entry_mode as 'quick_log' | 'photo_ai',
+          id: row.id,
+          imageUrl: row.image_path ? (signedUrlMap.get(row.image_path) ?? null) : null,
+          manualStatus: row.manual_status as ManualStatus,
+          note: row.note,
+          petName,
+          riskLevel: row.risk_level,
+          status: row.status,
+          summary: row.summary,
+        };
+      });
     },
     enabled: !!user && !!supabase,
-    staleTime: 30_000, // 30 秒：首頁紀錄變動較頻繁
+    staleTime: 30_000,
+  });
+}
+
+// ─── 歷史紀錄（分頁，含 signed URL）──────────────────────────────────────────
+
+export type HistoryLog = {
+  capturedAt: string;
+  entryMode: 'quick_log' | 'photo_ai';
+  id: string;
+  imagePath: string | null;
+  imageUrl: string | null;
+  manualStatus: ManualStatus;
+  note: string | null;
+  petId: string | null;
+  petName: string;
+  recommendation: string | null;
+  riskLevel: RiskLevel;
+  status: string;
+  summary: string | null;
+};
+
+export function useHistoryLogs() {
+  const { user } = useSession();
+
+  return useInfiniteQuery({
+    queryKey: [POOP_LOGS_KEY, user?.id, 'history'],
+    initialPageParam: 0,
+    queryFn: async ({ pageParam }) => {
+      if (!supabase || !user) return [] as HistoryLog[];
+
+      const offset = pageParam as number;
+      const { data: rows, error } = await supabase
+        .from('poop_logs')
+        .select('id, captured_at, image_path, status, summary, recommendation, risk_level, pet_id, entry_mode, manual_status, note, pets(name)')
+        .order('captured_at', { ascending: false })
+        .range(offset, offset + HISTORY_PAGE_SIZE - 1);
+
+      if (error) throw error;
+
+      const signedUrlMap = await batchSignedUrls((rows ?? []).map((r) => r.image_path));
+
+      return (rows ?? []).map((row): HistoryLog => {
+        const petName =
+          row.pets && typeof row.pets === 'object' && 'name' in row.pets
+            ? (row.pets as { name: string }).name
+            : '未分類';
+
+        return {
+          capturedAt: row.captured_at,
+          entryMode: (row.entry_mode ?? 'photo_ai') as 'quick_log' | 'photo_ai',
+          id: row.id,
+          imagePath: row.image_path ?? null,
+          imageUrl: row.image_path ? (signedUrlMap.get(row.image_path) ?? null) : null,
+          manualStatus: row.manual_status as ManualStatus,
+          note: row.note ?? null,
+          petId: row.pet_id ?? null,
+          petName,
+          recommendation: row.recommendation ?? null,
+          riskLevel: row.risk_level,
+          status: row.status,
+          summary: row.summary ?? null,
+        };
+      });
+    },
+    getNextPageParam: (lastPage, allPages) => {
+      if (lastPage.length < HISTORY_PAGE_SIZE) return undefined;
+      return allPages.reduce((sum, page) => sum + page.length, 0);
+    },
+    enabled: !!user && !!supabase,
+    staleTime: 30_000,
   });
 }
 
@@ -110,7 +204,6 @@ export function useQuickLog() {
       return data;
     },
     onSuccess: (data, variables) => {
-      // 異常或偏軟排程次日追蹤提醒
       if (variables.manualStatus === 'abnormal' || variables.manualStatus === 'soft') {
         void scheduleAbnormalFollowUp(data.id);
       }
@@ -147,18 +240,6 @@ export function useStats() {
 
       const rows = (data ?? []) as { captured_at: string; risk_level: RiskLevel; entry_mode: string; manual_status: ManualStatus }[];
 
-      // 計算有效 risk_level：photo_ai 用 risk_level，quick_log 用 manual_status 對應
-      const effectiveRisk = (row: typeof rows[number]): RiskLevel => {
-        if (row.entry_mode === 'photo_ai') return row.risk_level;
-        switch (row.manual_status) {
-          case 'normal': return 'normal';
-          case 'soft':
-          case 'hard': return 'observe';
-          case 'abnormal': return 'vet';
-          default: return null;
-        }
-      };
-
       return {
         total: rows.length,
         normal: rows.filter((r) => effectiveRisk(r) === 'normal').length,
@@ -168,7 +249,7 @@ export function useStats() {
       } satisfies StatsData;
     },
     enabled: !!user && !!supabase,
-    staleTime: 2 * 60_000, // 統計 2 分鐘 stale（不需要即時）
+    staleTime: 2 * 60_000,
   });
 }
 
@@ -202,17 +283,6 @@ export function useTrendSummary() {
       if (rows.length === 0) {
         return { message: '還沒有記錄，開始第一筆吧', recentCount: 0, hasRecentAbnormal: false, lastAbnormalDaysAgo: null } satisfies TrendSummary;
       }
-
-      const effectiveRisk = (row: typeof rows[number]): RiskLevel => {
-        if (row.entry_mode === 'photo_ai') return row.risk_level as RiskLevel;
-        switch (row.manual_status) {
-          case 'normal': return 'normal';
-          case 'soft':
-          case 'hard': return 'observe';
-          case 'abnormal': return 'vet';
-          default: return null;
-        }
-      };
 
       const now = Date.now();
       const abnormalIdx = rows.findIndex((r) => {
