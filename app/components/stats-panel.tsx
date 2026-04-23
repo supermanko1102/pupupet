@@ -13,6 +13,7 @@ import { useSession } from '@/providers/session-provider';
 import type { Database } from '@/types/database';
 
 type RiskLevel = Database['public']['Tables']['poop_logs']['Row']['risk_level'];
+type ManualStatus = Database['public']['Tables']['poop_logs']['Row']['manual_status'];
 
 type DayActivity = {
   date: string;       // 'YYYY-MM-DD'
@@ -23,9 +24,20 @@ type DayActivity = {
 
 const WEEK_LABELS = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
 
-function buildLast7Days(
-  logs: { captured_at: string; risk_level: RiskLevel }[]
-): DayActivity[] {
+type LogRow = { captured_at: string; risk_level: RiskLevel; entry_mode: string; manual_status: ManualStatus };
+
+function effectiveRisk(row: LogRow): RiskLevel {
+  if (row.entry_mode === 'photo_ai') return row.risk_level;
+  switch (row.manual_status) {
+    case 'normal': return 'normal';
+    case 'soft':
+    case 'hard': return 'observe';
+    case 'abnormal': return 'vet';
+    default: return null;
+  }
+}
+
+function buildLast7Days(logs: LogRow[]): DayActivity[] {
   const days: DayActivity[] = [];
   const now = new Date();
 
@@ -37,9 +49,9 @@ function buildLast7Days(
 
     const dayLogs = logs.filter((l) => l.captured_at.slice(0, 10) === dateStr);
     let riskLevel: RiskLevel | null = null;
-    if (dayLogs.some((l) => l.risk_level === 'vet')) riskLevel = 'vet';
-    else if (dayLogs.some((l) => l.risk_level === 'observe')) riskLevel = 'observe';
-    else if (dayLogs.some((l) => l.risk_level === 'normal')) riskLevel = 'normal';
+    if (dayLogs.some((l) => effectiveRisk(l) === 'vet')) riskLevel = 'vet';
+    else if (dayLogs.some((l) => effectiveRisk(l) === 'observe')) riskLevel = 'observe';
+    else if (dayLogs.some((l) => effectiveRisk(l) === 'normal')) riskLevel = 'normal';
 
     days.push({ date: dateStr, label, riskLevel });
   }

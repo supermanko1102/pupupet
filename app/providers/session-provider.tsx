@@ -6,7 +6,6 @@ import { supabase } from '@/lib/supabase';
 
 type SessionContextValue = {
   authError: string | null;
-  debugLog: string[];
   isReady: boolean;
   session: Session | null;
   user: User | null;
@@ -14,7 +13,6 @@ type SessionContextValue = {
 
 const SessionContext = createContext<SessionContextValue>({
   authError: null,
-  debugLog: [],
   isReady: false,
   session: null,
   user: null,
@@ -77,12 +75,6 @@ export function SessionProvider({ children }: PropsWithChildren) {
     <SessionContext.Provider
       value={{
         authError,
-        debugLog: [
-          `isReady=${String(isReady)}`,
-          `hasSession=${String(Boolean(session))}`,
-          `hasUser=${String(Boolean(session?.user))}`,
-          `authError=${authError ?? '(none)'}`,
-        ],
         isReady,
         session,
         user: session?.user ?? null,

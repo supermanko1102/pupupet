@@ -2,60 +2,46 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Animated,
-  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
+import { LogDetailModal, type DetailLog } from '@/components/log-detail-modal';
+import { PhotoAnalysisModal, type AnalysisResult } from '@/components/photo-analysis-modal';
+import { QuickLogModal } from '@/components/quick-log-modal';
 import { SettingsPanel } from '@/components/settings-panel';
+import { StatusPill } from '@/components/status-pill';
 
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { usePets, useAssignPet } from '@/hooks/use-pets';
 import { useRecentLogs, useQuickLog } from '@/hooks/use-poop-logs';
+import {
+  logStatusLabel,
+  logStatusTone,
+  manualStatusBg,
+  manualStatusEmoji,
+  manualStatusLabel,
+} from '@/lib/log-utils';
 import { scheduleAbnormalFollowUp } from '@/lib/notifications';
 import { uploadPoopPhoto } from '@/lib/uploads';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/providers/session-provider';
 import type { Database } from '@/types/database';
 
-type RiskLevel = Database['public']['Tables']['poop_logs']['Row']['risk_level'];
 type ManualStatus = Database['public']['Tables']['poop_logs']['Row']['manual_status'];
 
-type RecentLog = {
-  bristolScore: number | null;
-  capturedAt: string;
-  entryMode: 'quick_log' | 'photo_ai';
-  id: string;
-  imageUrl: string | null;
-  manualStatus: ManualStatus;
-  note: string | null;
-  petName: string;
-  riskLevel: RiskLevel;
-  status: string;
-  summary: string | null;
-};
-
-// ─── Quick Log Status Options ────────────────────────────────────────────────
-
-const QUICK_STATUS_OPTIONS: { value: NonNullable<ManualStatus>; label: string; emoji: string; tone: 'success' | 'warning' | 'danger' | 'neutral' }[] = [
-  { value: 'normal', label: '正常', emoji: '✅', tone: 'success' },
-  { value: 'soft', label: '偏軟', emoji: '🟡', tone: 'warning' },
-  { value: 'hard', label: '偏硬', emoji: '🟤', tone: 'warning' },
-  { value: 'abnormal', label: '異常', emoji: '🚨', tone: 'danger' },
-];
 
 export default function HomeScreen() {
   const colorScheme = useColorScheme() ?? 'light';
@@ -89,16 +75,16 @@ export default function HomeScreen() {
   const [isUploading, setIsUploading] = useState(false);
   const [capturedAsset, setCapturedAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [modalPhase, setModalPhase] = useState<'analyzing' | 'result'>('analyzing');
-  const [analysisResult, setAnalysisResult] = useState<{
-    imageUrl: string;
-    bristolScore: number | null;
-    riskLevel: RiskLevel;
-    summary: string | null;
-    recommendation: string | null;
-    failed?: boolean;
-  } | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [detailLog, setDetailLog] = useState<RecentLog | null>(null);
+  const [detailLog, setDetailLog] = useState<DetailLog | null>(null);
+
+  // 元件 unmount 時清除 polling，避免 memory leak
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, []);
 
   // ── quick log state ───────────────────────────────────────────────────────
   const [quickLogVisible, setQuickLogVisible] = useState(false);
@@ -240,174 +226,27 @@ export default function HomeScreen() {
 
   return (
     <>
-    {/* ── 拍照分析 Modal ──────────────────────────────────────────────────── */}
-    <Modal visible={!!capturedAsset} animationType="slide" presentationStyle="pageSheet">
-      <SafeAreaView style={styles.modalSafe}>
+    <PhotoAnalysisModal
+      capturedAsset={capturedAsset}
+      modalPhase={modalPhase}
+      analysisResult={analysisResult}
+      petAssigned={petAssigned}
+      pets={pets}
+      onAssignPet={(petId) => void assignPet(petId)}
+      onClose={closePhotoModal}
+    />
 
-        {modalPhase === 'analyzing' && (
-          <View style={styles.analyzingContainer}>
-            {capturedAsset && (
-              <Image source={{ uri: capturedAsset.uri }} style={styles.analyzingImage} contentFit="cover" />
-            )}
-            <View style={styles.analyzingOverlay}>
-              <ActivityIndicator size="large" color="#20B2AA" />
-              <Text style={styles.analyzingTitle}>AI 分析中...</Text>
-              <Text style={styles.analyzingSubtitle}>正在分析健康狀況，請稍候</Text>
-            </View>
-          </View>
-        )}
-
-        {modalPhase === 'result' && analysisResult && (
-          <ScrollView style={styles.resultScroll} contentContainerStyle={styles.resultContent}>
-            {analysisResult.imageUrl ? (
-              <Image source={{ uri: analysisResult.imageUrl }} style={styles.resultImage} contentFit="cover" />
-            ) : null}
-
-            <View style={styles.resultBody}>
-              <View style={[styles.riskBanner, riskBannerStyle(analysisResult.failed ? null : analysisResult.riskLevel)]}>
-                <Text style={styles.riskBannerIcon}>{analysisResult.failed ? '❌' : riskIcon(analysisResult.riskLevel)}</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.riskBannerTitle, { color: riskBannerStyle(analysisResult.failed ? null : analysisResult.riskLevel).textColor }]}>
-                    {analysisResult.failed ? '分析失敗' : riskTitle(analysisResult.riskLevel)}
-                  </Text>
-                  <Text style={[styles.riskBannerSub, { color: riskBannerStyle(analysisResult.failed ? null : analysisResult.riskLevel).textColor }]}>
-                    {analysisResult.summary ?? ''}
-                  </Text>
-                </View>
-              </View>
-
-              {analysisResult.recommendation && (
-                <View style={styles.recommendBox}>
-                  <Text style={styles.recommendLabel}>建議</Text>
-                  <Text style={styles.recommendText}>{analysisResult.recommendation}</Text>
-                </View>
-              )}
-
-              {/* 異常提示 */}
-              {!analysisResult.failed && (analysisResult.riskLevel === 'vet' || analysisResult.riskLevel === 'observe') && (
-                <View style={styles.trackingNotice}>
-                  <Ionicons name="notifications-outline" size={16} color="#92400e" />
-                  <Text style={styles.trackingNoticeText}>明天會提醒你追蹤狀況</Text>
-                </View>
-              )}
-
-              {!analysisResult.failed && (
-                <View style={styles.petPickerSection}>
-                  {petAssigned ? (
-                    <Text style={styles.petPickerDone}>✓ 已分類</Text>
-                  ) : (
-                    <>
-                      <Text style={styles.petPickerTitle}>這是哪一隻的紀錄？</Text>
-                      {pets.length > 0 && (
-                        <View style={styles.petPickerRow}>
-                          {pets.map((pet) => (
-                            <Pressable
-                              key={pet.id}
-                              style={styles.petPickerButton}
-                              onPress={() => void assignPet(pet.id)}>
-                              <Text style={styles.petPickerEmoji}>
-                                {pet.species === 'dog' ? '🐶' : pet.species === 'cat' ? '🐱' : '🐾'}
-                              </Text>
-                              <Text style={styles.petPickerName}>{pet.name}</Text>
-                            </Pressable>
-                          ))}
-                        </View>
-                      )}
-                      <Pressable onPress={closePhotoModal}>
-                        <Text style={styles.petPickerSkip}>略過，之後再分類</Text>
-                      </Pressable>
-                    </>
-                  )}
-                </View>
-              )}
-            </View>
-
-            <View style={styles.modalActions}>
-              {(petAssigned || analysisResult.failed) && (
-                <Pressable style={[styles.modalButton, styles.primaryButton]} onPress={closePhotoModal}>
-                  <Text style={styles.primaryButtonText}>完成</Text>
-                </Pressable>
-              )}
-            </View>
-          </ScrollView>
-        )}
-
-      </SafeAreaView>
-    </Modal>
-
-    {/* ── 快速記錄 Modal ──────────────────────────────────────────────────── */}
-    <Modal visible={quickLogVisible} animationType="slide" presentationStyle="pageSheet">
-      <SafeAreaView style={styles.modalSafe}>
-        {quickLogDone ? (
-          <View style={styles.quickDoneContainer}>
-            <Text style={styles.quickDoneEmoji}>
-              {selectedStatus === 'normal' ? '✅' : selectedStatus === 'abnormal' ? '🚨' : '📝'}
-            </Text>
-            <Text style={styles.quickDoneTitle}>記錄完成</Text>
-            {(selectedStatus === 'abnormal' || selectedStatus === 'soft') && (
-              <View style={styles.trackingNotice}>
-                <Ionicons name="notifications-outline" size={16} color="#92400e" />
-                <Text style={styles.trackingNoticeText}>明天會提醒你追蹤狀況</Text>
-              </View>
-            )}
-            <Pressable style={[styles.modalButton, styles.primaryButton, { marginTop: 24, width: '80%' }]}
-              onPress={() => setQuickLogVisible(false)}>
-              <Text style={styles.primaryButtonText}>好</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <View style={styles.quickLogContainer}>
-            <Text style={styles.quickLogTitle}>今天狀況如何？</Text>
-            <Text style={styles.quickLogSubtitle}>選一個最接近的描述</Text>
-
-            <View style={styles.statusGrid}>
-              {QUICK_STATUS_OPTIONS.map((opt) => (
-                <Pressable
-                  key={opt.value}
-                  style={[
-                    styles.statusCard,
-                    selectedStatus === opt.value && styles.statusCardSelected,
-                    selectedStatus === opt.value && { borderColor: toneBorderColor(opt.tone) },
-                  ]}
-                  onPress={() => setSelectedStatus(opt.value)}>
-                  <Text style={styles.statusEmoji}>{opt.emoji}</Text>
-                  <Text style={[styles.statusLabel, selectedStatus === opt.value && { color: '#171d1c', fontWeight: '700' }]}>
-                    {opt.label}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-
-            <View style={styles.noteInputWrap}>
-              <TextInput
-                style={styles.noteInput}
-                placeholder="補充備註（可略）"
-                placeholderTextColor="#bbc9c7"
-                value={quickNote}
-                onChangeText={setQuickNote}
-                maxLength={100}
-              />
-            </View>
-
-            <View style={styles.modalActions}>
-              <Pressable
-                style={[styles.modalButton, styles.primaryButton, !selectedStatus && styles.buttonDisabled]}
-                disabled={!selectedStatus || quickLogMutation.isPending}
-                onPress={() => void submitQuickLog()}>
-                {quickLogMutation.isPending ? (
-                  <ActivityIndicator color="#ffffff" />
-                ) : (
-                  <Text style={styles.primaryButtonText}>記錄</Text>
-                )}
-              </Pressable>
-              <Pressable style={[styles.modalButton, styles.ghostButton]} onPress={() => setQuickLogVisible(false)}>
-                <Text style={styles.ghostButtonText}>取消</Text>
-              </Pressable>
-            </View>
-          </View>
-        )}
-      </SafeAreaView>
-    </Modal>
+    <QuickLogModal
+      visible={quickLogVisible}
+      selectedStatus={selectedStatus}
+      quickNote={quickNote}
+      quickLogDone={quickLogDone}
+      isPending={quickLogMutation.isPending}
+      onSelectStatus={setSelectedStatus}
+      onChangeNote={setQuickNote}
+      onSubmit={() => void submitQuickLog()}
+      onClose={() => setQuickLogVisible(false)}
+    />
 
     <LinearGradient
       colors={['rgba(32, 178, 170, 0.08)', '#ffffff', '#ffffff']}
@@ -553,162 +392,12 @@ export default function HomeScreen() {
       </SafeAreaView>
     </LinearGradient>
 
-    {/* 歷史記錄詳細 Modal */}
-    <Modal visible={!!detailLog} animationType="slide" presentationStyle="pageSheet">
-      <SafeAreaView style={styles.modalSafe}>
-        {detailLog && (
-          <ScrollView style={styles.resultScroll} contentContainerStyle={styles.resultContent}>
-            {detailLog.entryMode === 'quick_log' ? (
-              <View style={[styles.detailQuickBanner, { backgroundColor: manualStatusBg(detailLog.manualStatus) }]}>
-                <Text style={styles.detailQuickEmoji}>{manualStatusEmoji(detailLog.manualStatus)}</Text>
-                <Text style={styles.detailQuickLabel}>{manualStatusLabel(detailLog.manualStatus)}</Text>
-              </View>
-            ) : detailLog.imageUrl ? (
-              <Image source={{ uri: detailLog.imageUrl }} style={styles.resultImage} contentFit="cover" />
-            ) : null}
-
-            <View style={styles.resultBody}>
-              {detailLog.entryMode === 'photo_ai' && (
-                <View style={[styles.riskBanner, riskBannerStyle(detailLog.riskLevel)]}>
-                  <Text style={styles.riskBannerIcon}>{riskIcon(detailLog.riskLevel)}</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.riskBannerTitle, { color: riskBannerStyle(detailLog.riskLevel).textColor }]}>
-                      {riskTitle(detailLog.riskLevel)}
-                    </Text>
-                    {detailLog.summary ? (
-                      <Text style={[styles.riskBannerSub, { color: riskBannerStyle(detailLog.riskLevel).textColor }]}>
-                        {detailLog.summary}
-                      </Text>
-                    ) : null}
-                  </View>
-                </View>
-              )}
-
-              {detailLog.note && (
-                <View style={styles.recommendBox}>
-                  <Text style={styles.recommendLabel}>備註</Text>
-                  <Text style={styles.recommendText}>{detailLog.note}</Text>
-                </View>
-              )}
-
-              <View style={styles.resultRow}>
-                <Text style={styles.resultLabel}>寵物</Text>
-                <Text style={styles.resultValue}>{detailLog.petName}</Text>
-              </View>
-              <View style={styles.resultRow}>
-                <Text style={styles.resultLabel}>時間</Text>
-                <Text style={styles.resultValue}>{new Date(detailLog.capturedAt).toLocaleString('zh-TW')}</Text>
-              </View>
-              <View style={styles.resultRow}>
-                <Text style={styles.resultLabel}>記錄方式</Text>
-                <Text style={styles.resultValue}>{detailLog.entryMode === 'quick_log' ? '快速記錄' : '拍照分析'}</Text>
-              </View>
-            </View>
-
-            <View style={styles.modalActions}>
-              <Pressable style={[styles.modalButton, styles.primaryButton]} onPress={() => setDetailLog(null)}>
-                <Text style={styles.primaryButtonText}>關閉</Text>
-              </Pressable>
-            </View>
-          </ScrollView>
-        )}
-      </SafeAreaView>
-    </Modal>
-
+    <LogDetailModal log={detailLog} onClose={() => setDetailLog(null)} />
     </>
   );
 }
 
-// ─── Helper Components ────────────────────────────────────────────────────────
 
-function StatusPill({ label, tone }: { label: string; tone: 'danger' | 'neutral' | 'success' | 'warning' }) {
-  const tones = {
-    danger: { bg: '#fde8e8', text: '#9a3412' },
-    neutral: { bg: '#e9efed', text: '#3c4948' },
-    success: { bg: '#d8f3e8', text: '#166534' },
-    warning: { bg: '#fef3c7', text: '#92400e' },
-  };
-  return (
-    <View style={[styles.pill, { backgroundColor: tones[tone].bg }]}>
-      <Text style={[styles.pillText, { color: tones[tone].text }]}>{label}</Text>
-    </View>
-  );
-}
-
-// ─── Helper Functions ─────────────────────────────────────────────────────────
-
-function logStatusLabel(log: RecentLog) {
-  if (log.entryMode === 'quick_log') return manualStatusLabel(log.manualStatus);
-  if (log.status !== 'done') return '待分析';
-  if (log.riskLevel === 'normal') return '正常';
-  if (log.riskLevel === 'observe') return '觀察';
-  if (log.riskLevel === 'vet') return '就醫';
-  return '已記錄';
-}
-
-function logStatusTone(log: RecentLog): 'danger' | 'neutral' | 'success' | 'warning' {
-  if (log.entryMode === 'quick_log') {
-    if (log.manualStatus === 'normal') return 'success';
-    if (log.manualStatus === 'abnormal') return 'danger';
-    if (log.manualStatus === 'soft' || log.manualStatus === 'hard') return 'warning';
-    return 'neutral';
-  }
-  if (log.riskLevel === 'normal') return 'success';
-  if (log.riskLevel === 'observe') return 'warning';
-  if (log.riskLevel === 'vet') return 'danger';
-  return 'neutral';
-}
-
-function manualStatusLabel(status: ManualStatus) {
-  if (status === 'normal') return '正常';
-  if (status === 'soft') return '偏軟';
-  if (status === 'hard') return '偏硬';
-  if (status === 'abnormal') return '異常';
-  return '未知';
-}
-
-function manualStatusEmoji(status: ManualStatus) {
-  if (status === 'normal') return '✅';
-  if (status === 'soft') return '🟡';
-  if (status === 'hard') return '🟤';
-  if (status === 'abnormal') return '🚨';
-  return '❓';
-}
-
-function manualStatusBg(status: ManualStatus) {
-  if (status === 'normal') return '#d8f3e8';
-  if (status === 'soft' || status === 'hard') return '#fef3c7';
-  if (status === 'abnormal') return '#fde8e8';
-  return '#e9efed';
-}
-
-function toneBorderColor(tone: 'success' | 'warning' | 'danger' | 'neutral') {
-  if (tone === 'success') return '#6ee7b7';
-  if (tone === 'warning') return '#fcd34d';
-  if (tone === 'danger') return '#fca5a5';
-  return '#bbc9c7';
-}
-
-function riskTitle(riskLevel: RiskLevel) {
-  if (riskLevel === 'normal') return '狀況正常';
-  if (riskLevel === 'observe') return '需要觀察';
-  if (riskLevel === 'vet') return '建議就醫';
-  return '分析完成';
-}
-
-function riskIcon(riskLevel: RiskLevel) {
-  if (riskLevel === 'normal') return '✅';
-  if (riskLevel === 'observe') return '⚠️';
-  if (riskLevel === 'vet') return '🏥';
-  return '📋';
-}
-
-function riskBannerStyle(riskLevel: RiskLevel) {
-  if (riskLevel === 'normal') return { backgroundColor: '#d8f3e8', borderColor: '#6ee7b7', textColor: '#065f46' };
-  if (riskLevel === 'observe') return { backgroundColor: '#fef3c7', borderColor: '#fcd34d', textColor: '#92400e' };
-  if (riskLevel === 'vet') return { backgroundColor: '#fde8e8', borderColor: '#fca5a5', textColor: '#9a3412' };
-  return { backgroundColor: '#e9efed', borderColor: '#bbc9c7', textColor: '#3c4948' };
-}
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
@@ -818,130 +507,7 @@ const styles = StyleSheet.create({
   logPetName: { color: '#171d1c', fontSize: 15, fontWeight: '600' },
   logDate: { color: '#6c7a78', fontSize: 13 },
   logSummary: { color: '#3c4948', fontSize: 14, lineHeight: 20, marginTop: 2 },
-  pill: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
-  pillText: { fontSize: 12, fontWeight: '700' },
   emptyState: { alignItems: 'center', gap: 12, marginTop: 24, paddingHorizontal: 40 },
   emptyText: { color: '#6c7a78', fontSize: 15, lineHeight: 22, textAlign: 'center' },
 
-  // Modal base
-  modalSafe: { flex: 1, backgroundColor: '#ffffff' },
-  modalActions: { gap: 12, padding: 24 },
-  modalButton: { alignItems: 'center', borderRadius: 16, height: 54, justifyContent: 'center' },
-  primaryButton: { backgroundColor: '#20B2AA' },
-  primaryButtonText: { color: '#ffffff', fontSize: 17, fontWeight: '700' },
-  ghostButton: { backgroundColor: '#e9efed' },
-  ghostButtonText: { color: '#3c4948', fontSize: 17, fontWeight: '600' },
-  buttonDisabled: { opacity: 0.4 },
-
-  // Analyzing
-  analyzingContainer: { flex: 1, position: 'relative' },
-  analyzingImage: { flex: 1, opacity: 0.4 },
-  analyzingOverlay: {
-    alignItems: 'center', bottom: 0, gap: 12, justifyContent: 'center',
-    left: 0, position: 'absolute', right: 0, top: 0,
-  },
-  analyzingTitle: { color: '#171d1c', fontSize: 22, fontWeight: '700' },
-  analyzingSubtitle: { color: '#6c7a78', fontSize: 15 },
-
-  // Result
-  resultScroll: { flex: 1 },
-  resultContent: { paddingBottom: 8 },
-  resultImage: { height: 260, width: '100%' },
-  resultBody: { gap: 16, padding: 20 },
-  riskBanner: {
-    alignItems: 'center', borderRadius: 16, borderWidth: 1,
-    flexDirection: 'row', gap: 14, padding: 16,
-  },
-  riskBannerIcon: { fontSize: 32 },
-  riskBannerTitle: { fontSize: 18, fontWeight: '700' },
-  riskBannerSub: { fontSize: 14, marginTop: 2, opacity: 0.8 },
-  resultRow: {
-    alignItems: 'center', backgroundColor: '#f5fbf9', borderRadius: 12,
-    flexDirection: 'row', justifyContent: 'space-between', padding: 14,
-  },
-  resultLabel: { color: '#6c7a78', fontSize: 15 },
-  resultValue: { color: '#171d1c', fontSize: 15, fontWeight: '700' },
-  recommendBox: { backgroundColor: '#f5fbf9', borderRadius: 12, gap: 6, padding: 14 },
-  recommendLabel: {
-    color: '#6c7a78', fontSize: 13, fontWeight: '600',
-    textTransform: 'uppercase', letterSpacing: 0.5,
-  },
-  recommendText: { color: '#3c4948', fontSize: 15, lineHeight: 22 },
-
-  // Tracking notice
-  trackingNotice: {
-    alignItems: 'center',
-    backgroundColor: '#fef3c7',
-    borderRadius: 12,
-    flexDirection: 'row',
-    gap: 8,
-    padding: 12,
-  },
-  trackingNoticeText: { color: '#92400e', fontSize: 14, fontWeight: '500' },
-
-  // Pet picker
-  petPickerSection: {
-    borderTopColor: '#e3e9e8', borderTopWidth: StyleSheet.hairlineWidth, gap: 12, paddingTop: 16,
-  },
-  petPickerTitle: {
-    color: '#6c7a78', fontSize: 13, fontWeight: '600',
-    letterSpacing: 0.4, textTransform: 'uppercase',
-  },
-  petPickerRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  petPickerButton: {
-    alignItems: 'center', backgroundColor: '#f5fbf9', borderColor: '#e3e9e8',
-    borderRadius: 12, borderWidth: 1, flexDirection: 'row',
-    gap: 6, paddingHorizontal: 14, paddingVertical: 10,
-  },
-  petPickerEmoji: { fontSize: 18 },
-  petPickerName: { color: '#171d1c', fontSize: 15, fontWeight: '600' },
-  petPickerSkip: { color: '#bbc9c7', fontSize: 14, textAlign: 'center' },
-  petPickerDone: { color: '#16a34a', fontSize: 14, fontWeight: '600', textAlign: 'center' },
-
-  // Quick log modal
-  quickLogContainer: { flex: 1, paddingTop: 32 },
-  quickLogTitle: {
-    color: '#171d1c', fontSize: 24, fontWeight: '700',
-    textAlign: 'center', marginBottom: 6,
-  },
-  quickLogSubtitle: { color: '#6c7a78', fontSize: 15, textAlign: 'center', marginBottom: 32 },
-  statusGrid: {
-    flexDirection: 'row', flexWrap: 'wrap', gap: 12,
-    justifyContent: 'center', paddingHorizontal: 24,
-  },
-  statusCard: {
-    alignItems: 'center',
-    backgroundColor: '#f5fbf9',
-    borderColor: '#e3e9e8',
-    borderRadius: 16,
-    borderWidth: 2,
-    gap: 8,
-    paddingVertical: 20,
-    width: '44%',
-  },
-  statusCardSelected: { backgroundColor: '#f0fdf9' },
-  statusEmoji: { fontSize: 36 },
-  statusLabel: { color: '#6c7a78', fontSize: 16, fontWeight: '600' },
-  noteInputWrap: { marginHorizontal: 24, marginTop: 20 },
-  noteInput: {
-    backgroundColor: '#f5fbf9',
-    borderColor: '#e3e9e8',
-    borderRadius: 12,
-    borderWidth: 1,
-    color: '#171d1c',
-    fontSize: 15,
-    padding: 14,
-  },
-
-  // Quick done
-  quickDoneContainer: { alignItems: 'center', flex: 1, justifyContent: 'center', gap: 12, paddingHorizontal: 40 },
-  quickDoneEmoji: { fontSize: 64 },
-  quickDoneTitle: { color: '#171d1c', fontSize: 24, fontWeight: '700' },
-
-  // Detail modal quick banner
-  detailQuickBanner: {
-    alignItems: 'center', gap: 8, justifyContent: 'center', paddingVertical: 48,
-  },
-  detailQuickEmoji: { fontSize: 56 },
-  detailQuickLabel: { fontSize: 20, fontWeight: '700', color: '#3c4948' },
 });

@@ -15,6 +15,17 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
+import {
+  logStatusLabel,
+  logStatusTone,
+  manualStatusBg,
+  manualStatusEmoji,
+  manualStatusLabel,
+  riskBannerStyle,
+  riskIcon,
+  riskTitle,
+} from '@/lib/log-utils';
+import { StatusPill } from '@/components/status-pill';
 import { supabase } from '@/lib/supabase';
 import { useTrendSummary } from '@/hooks/use-poop-logs';
 import { useSession } from '@/providers/session-provider';
@@ -364,21 +375,6 @@ function LogCard({ log, onPress }: { log: LogItem; onPress: () => void }) {
   );
 }
 
-// ─── StatusPill ───────────────────────────────────────────────────────────────
-
-function StatusPill({ label, tone }: { label: string; tone: 'danger' | 'neutral' | 'success' | 'warning' }) {
-  const tones = {
-    danger: { bg: '#fde8e8', text: '#9a3412' },
-    neutral: { bg: '#e9efed', text: '#3c4948' },
-    success: { bg: '#d8f3e8', text: '#166534' },
-    warning: { bg: '#fef3c7', text: '#92400e' },
-  };
-  return (
-    <View style={[styles.pill, { backgroundColor: tones[tone].bg }]}>
-      <Text style={[styles.pillText, { color: tones[tone].text }]}>{label}</Text>
-    </View>
-  );
-}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -406,71 +402,6 @@ function buildSections(logs: LogItem[]): Section[] {
   return sections;
 }
 
-function logStatusLabel(log: LogItem) {
-  if (log.entryMode === 'quick_log') return manualStatusLabel(log.manualStatus);
-  if (log.status !== 'done') return '分析中';
-  if (log.riskLevel === 'normal') return '正常';
-  if (log.riskLevel === 'observe') return '觀察';
-  if (log.riskLevel === 'vet') return '就醫';
-  return '已記錄';
-}
-
-function logStatusTone(log: LogItem): 'danger' | 'neutral' | 'success' | 'warning' {
-  if (log.entryMode === 'quick_log') {
-    if (log.manualStatus === 'normal') return 'success';
-    if (log.manualStatus === 'abnormal') return 'danger';
-    if (log.manualStatus === 'soft' || log.manualStatus === 'hard') return 'warning';
-    return 'neutral';
-  }
-  if (log.riskLevel === 'normal') return 'success';
-  if (log.riskLevel === 'observe') return 'warning';
-  if (log.riskLevel === 'vet') return 'danger';
-  return 'neutral';
-}
-
-function manualStatusLabel(status: ManualStatus) {
-  if (status === 'normal') return '正常';
-  if (status === 'soft') return '偏軟';
-  if (status === 'hard') return '偏硬';
-  if (status === 'abnormal') return '異常';
-  return '未知';
-}
-
-function manualStatusEmoji(status: ManualStatus) {
-  if (status === 'normal') return '✅';
-  if (status === 'soft') return '🟡';
-  if (status === 'hard') return '🟤';
-  if (status === 'abnormal') return '🚨';
-  return '❓';
-}
-
-function manualStatusBg(status: ManualStatus) {
-  if (status === 'normal') return '#d8f3e8';
-  if (status === 'soft' || status === 'hard') return '#fef3c7';
-  if (status === 'abnormal') return '#fde8e8';
-  return '#e9efed';
-}
-
-function riskTitle(riskLevel: RiskLevel) {
-  if (riskLevel === 'normal') return '狀況正常';
-  if (riskLevel === 'observe') return '需要觀察';
-  if (riskLevel === 'vet') return '建議就醫';
-  return '分析完成';
-}
-
-function riskIcon(riskLevel: RiskLevel) {
-  if (riskLevel === 'normal') return '✅';
-  if (riskLevel === 'observe') return '⚠️';
-  if (riskLevel === 'vet') return '🏥';
-  return '📋';
-}
-
-function riskBannerStyle(riskLevel: RiskLevel) {
-  if (riskLevel === 'normal') return { backgroundColor: '#d8f3e8', borderColor: '#6ee7b7', textColor: '#065f46' };
-  if (riskLevel === 'observe') return { backgroundColor: '#fef3c7', borderColor: '#fcd34d', textColor: '#92400e' };
-  if (riskLevel === 'vet') return { backgroundColor: '#fde8e8', borderColor: '#fca5a5', textColor: '#9a3412' };
-  return { backgroundColor: '#e9efed', borderColor: '#bbc9c7', textColor: '#3c4948' };
-}
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
@@ -539,8 +470,7 @@ const styles = StyleSheet.create({
   cardPetName: { color: '#171d1c', fontSize: 15, fontWeight: '600' },
   cardDate: { color: '#6c7a78', fontSize: 12 },
   cardSummary: { color: '#3c4948', fontSize: 13, lineHeight: 18, marginTop: 2 },
-  pill: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
-  pillText: { fontSize: 12, fontWeight: '700' },
+
 
   // Empty
   emptyState: {
