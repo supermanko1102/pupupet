@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -8,7 +8,7 @@ import {
   View,
 } from 'react-native';
 
-import { supabase } from '@/lib/supabase';
+import { POOP_LOGS_KEY, useStats } from '@/hooks/use-poop-logs';
 import { useSession } from '@/providers/session-provider';
 import type { Database } from '@/types/database';
 
@@ -20,13 +20,6 @@ type DayActivity = {
   riskLevel: RiskLevel | null;  // worst risk of the day, null = no log
 };
 
-type Stats = {
-  total: number;
-  normal: number;
-  observe: number;
-  vet: number;
-  last7Days: DayActivity[];
-};
 
 const WEEK_LABELS = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
 
@@ -79,39 +72,17 @@ function SummaryCard({ count, label, color }: { count: number; label: string; co
 
 export function StatsPanel() {
   const { user } = useSession();
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const queryClient = useQueryClient();
+  const { data: statsData, isLoading, isRefetching, refetch } = useStats();
 
-  const load = useCallback(
-    async (isRefresh = false) => {
-      if (!supabase || !user) return;
-      if (isRefresh) setIsRefreshing(true);
-      else setIsLoading(true);
+  const stats = statsData
+    ? { ...statsData, last7Days: buildLast7Days(statsData.rows) }
+    : null;
 
-      const { data: logs } = await supabase
-        .from('poop_logs')
-        .select('captured_at, risk_level')
-        .eq('status', 'done')
-        .order('captured_at', { ascending: false });
-
-      const rows = (logs ?? []) as { captured_at: string; risk_level: RiskLevel }[];
-
-      setStats({
-        total: rows.length,
-        normal: rows.filter((r) => r.risk_level === 'normal').length,
-        observe: rows.filter((r) => r.risk_level === 'observe').length,
-        vet: rows.filter((r) => r.risk_level === 'vet').length,
-        last7Days: buildLast7Days(rows),
-      });
-
-      setIsLoading(false);
-      setIsRefreshing(false);
-    },
-    [user]
-  );
-
-  useEffect(() => { void load(); }, [load]);
+  function handleRefresh() {
+    void queryClient.invalidateQueries({ queryKey: [POOP_LOGS_KEY, user?.id, 'stats'] });
+    void refetch();
+  }
 
   if (isLoading) {
     return (
@@ -131,7 +102,7 @@ export function StatsPanel() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl refreshing={isRefreshing} onRefresh={() => void load(true)} tintColor="#20B2AA" />
+        <RefreshControl refreshing={isRefetching} onRefresh={handleRefresh} tintColor="#20B2AA" />
       }>
 
       <Text style={styles.pageTitle}>便便統計</Text>

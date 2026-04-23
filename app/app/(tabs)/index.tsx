@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -25,12 +25,13 @@ type ActiveTab = 'scan' | 'stats';
 
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { usePets, useAssignPet } from '@/hooks/use-pets';
+import { useRecentLogs } from '@/hooks/use-poop-logs';
 import { uploadPoopPhoto } from '@/lib/uploads';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/providers/session-provider';
 import type { Database } from '@/types/database';
 
-type Pet = Database['public']['Tables']['pets']['Row'];
 type RiskLevel = Database['public']['Tables']['poop_logs']['Row']['risk_level'];
 
 type RecentLog = {
@@ -46,13 +47,14 @@ type RecentLog = {
 
 export default function HomeScreen() {
   const colorScheme = useColorScheme() ?? 'light';
-  const { isReady, user } = useSession();
+  const { user } = useSession();
   const palette = Colors[colorScheme];
 
-  const [pets, setPets] = useState<Pet[]>([]);
+  const { data: pets = [] } = usePets();
+  const { data: recentLogs = [], isLoading, isRefetching, refetch: refetchLogs } = useRecentLogs();
+  const assignPetMutation = useAssignPet();
   const [currentLogId, setCurrentLogId] = useState<string | null>(null);
   const [petAssigned, setPetAssigned] = useState(false);
-  const [recentLogs, setRecentLogs] = useState<RecentLog[]>([]);
   const [activeTab, setActiveTab] = useState<ActiveTab>('scan');
   const [menuOpen, setMenuOpen] = useState(false);
   const iconAnim = useRef(new Animated.Value(0)).current;
@@ -70,8 +72,6 @@ export default function HomeScreen() {
     Animated.timing(iconAnim, { toValue: 0, duration: 180, useNativeDriver: true }).start(() => setMenuOpen(false));
   }
 
-  const [isLoading, setIsLoading] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [capturedAsset, setCapturedAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [modalPhase, setModalPhase] = useState<'preview' | 'analyzing' | 'result'>('preview');
@@ -86,63 +86,6 @@ export default function HomeScreen() {
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [detailLog, setDetailLog] = useState<RecentLog | null>(null);
 
-  const loadDashboard = useCallback(
-    async (isPullToRefresh = false) => {
-      if (!supabase || !user) return;
-
-      const client = supabase;
-
-      if (isPullToRefresh) {
-        setIsRefreshing(true);
-      } else {
-        setIsLoading(true);
-      }
-
-      const [{ data: petsData }, { data: logRows }] = await Promise.all([
-        client.from('pets').select('*').order('created_at', { ascending: false }),
-        client
-          .from('poop_logs')
-          .select('id, captured_at, image_path, status, summary, risk_level, bristol_score, pets(name)')
-          .order('captured_at', { ascending: false })
-          .limit(8),
-      ]);
-
-      const nextPets = petsData ?? [];
-      setPets(nextPets);
-
-      const nextLogs = await Promise.all(
-        (logRows ?? []).map(async (row) => {
-          const petNameValue =
-            row.pets && typeof row.pets === 'object' && 'name' in row.pets
-              ? row.pets.name
-              : '未分類';
-          const { data } = await client.storage
-            .from('poop-photos')
-            .createSignedUrl(row.image_path, 60 * 60);
-          return {
-            bristolScore: row.bristol_score,
-            capturedAt: row.captured_at,
-            id: row.id,
-            imageUrl: data?.signedUrl ?? null,
-            petName: petNameValue,
-            riskLevel: row.risk_level,
-            status: row.status,
-            summary: row.summary,
-          } satisfies RecentLog;
-        })
-      );
-
-      setRecentLogs(nextLogs);
-      setIsLoading(false);
-      setIsRefreshing(false);
-    },
-    [user]
-  );
-
-  useEffect(() => {
-    if (!isReady || !user || !supabase) return;
-    void loadDashboard();
-  }, [isReady, loadDashboard, user]);
 
   async function uploadAsset(asset: ImagePicker.ImagePickerAsset) {
     if (!supabase || !user) return;
@@ -168,10 +111,10 @@ export default function HomeScreen() {
   }
 
   async function assignPet(petId: string) {
-    if (!supabase || !currentLogId) return;
-    await supabase.from('poop_logs').update({ pet_id: petId }).eq('id', currentLogId);
+    if (!currentLogId) return;
+    await assignPetMutation.mutateAsync({ logId: currentLogId, petId });
+    void refetchLogs();
     setPetAssigned(true);
-    void loadDashboard();
   }
 
   async function startScan() {
@@ -235,7 +178,7 @@ export default function HomeScreen() {
           failed: data.status === 'failed',
         });
         setModalPhase('result');
-        void loadDashboard();
+        void refetchLogs();
       }
     }, 2000);
   }
@@ -382,8 +325,8 @@ export default function HomeScreen() {
               showsVerticalScrollIndicator={false}
               refreshControl={
                 <RefreshControl
-                  refreshing={isRefreshing}
-                  onRefresh={() => (user ? void loadDashboard(true) : undefined)}
+                  refreshing={isRefetching}
+                  onRefresh={() => void refetchLogs()}
                 />
               }>
           {/* Hero Text */}

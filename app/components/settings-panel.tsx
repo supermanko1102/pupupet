@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 
+import { useCreatePet, useDeletePet, usePets, useUpdatePet } from '@/hooks/use-pets';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/providers/session-provider';
 import type { Database } from '@/types/database';
@@ -87,22 +88,7 @@ function PetsListView({
   onBack: () => void;
   onEditPet: (pet: Pet | null) => void;
 }) {
-  const { user } = useSession();
-  const [pets, setPets] = useState<Pet[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const load = useCallback(async () => {
-    if (!supabase || !user) return;
-    setIsLoading(true);
-    const { data } = await supabase
-      .from('pets')
-      .select('*')
-      .order('created_at', { ascending: true });
-    setPets(data ?? []);
-    setIsLoading(false);
-  }, [user]);
-
-  useEffect(() => { void load(); }, [load]);
+  const { data: pets = [], isLoading } = usePets();
 
   return (
     <>
@@ -176,19 +162,21 @@ function PetEditView({
   onSaved: () => void;
   onDeleted: () => void;
 }) {
-  const { user } = useSession();
   const isNew = pet === null;
+  const createPet = useCreatePet();
+  const updatePet = useUpdatePet();
+  const deletePet = useDeletePet();
 
   const [name, setName] = useState(pet?.name ?? '');
   const [breed, setBreed] = useState(pet?.breed ?? '');
   const [weightKg, setWeightKg] = useState(pet?.weight_kg ? String(pet.weight_kg) : '');
   const [species, setSpecies] = useState<Species>(pet?.species ?? 'dog');
-  const [isSaving, setIsSaving] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
+
+  const isSaving = createPet.isPending || updatePet.isPending;
+  const isDeleting = deletePet.isPending;
 
   async function save() {
-    if (!supabase || !user || !name.trim()) return;
-    setIsSaving(true);
+    if (!name.trim()) return;
     const fields = {
       name: name.trim(),
       breed: breed.trim() || null,
@@ -197,17 +185,13 @@ function PetEditView({
     };
     try {
       if (isNew) {
-        const { error } = await supabase.from('pets').insert(fields);
-        if (error) throw error;
+        await createPet.mutateAsync(fields);
       } else {
-        const { error } = await supabase.from('pets').update(fields).eq('id', pet.id);
-        if (error) throw error;
+        await updatePet.mutateAsync({ id: pet.id, ...fields });
       }
       onSaved();
     } catch (err) {
       Alert.alert('儲存失敗', err instanceof Error ? err.message : '請稍後再試。');
-    } finally {
-      setIsSaving(false);
     }
   }
 
@@ -221,14 +205,12 @@ function PetEditView({
           text: '刪除',
           style: 'destructive',
           onPress: async () => {
-            if (!supabase || !pet) return;
-            setIsDeleting(true);
-            const { error } = await supabase.from('pets').delete().eq('id', pet.id);
-            setIsDeleting(false);
-            if (error) {
-              Alert.alert('刪除失敗', error.message);
-            } else {
+            if (!pet) return;
+            try {
+              await deletePet.mutateAsync(pet.id);
               onDeleted();
+            } catch (err) {
+              Alert.alert('刪除失敗', err instanceof Error ? err.message : '請稍後再試。');
             }
           },
         },
