@@ -17,12 +17,14 @@ import {
   riskIcon,
   riskTitle,
 } from '@/lib/log-utils';
+import { cancelFollowUp, scheduleAbnormalFollowUp } from '@/lib/notifications';
 import type { HistoryLog } from '@/hooks/use-poop-logs';
 import type { Database } from '@/types/database';
 
 type Pet = Database['public']['Tables']['pets']['Row'];
 
 type Props = {
+  footerVariant?: 'default' | 'follow-up';
   isAssigningPet?: boolean;
   log: HistoryLog;
   onAssignPet?: (petId: string) => void;
@@ -31,6 +33,7 @@ type Props = {
 };
 
 export function HistoryLogDetailContent({
+  footerVariant = 'default',
   isAssigningPet = false,
   log,
   onAssignPet,
@@ -121,11 +124,27 @@ export function HistoryLogDetailContent({
         </View>
       </View>
 
-      <View style={styles.actions}>
-        <Pressable style={styles.closeButton} onPress={onClose}>
-          <Text style={styles.closeButtonText}>關閉</Text>
-        </Pressable>
-      </View>
+      {footerVariant === 'follow-up' && log.riskLevel !== 'normal' ? (
+        <View style={styles.actions}>
+          <Text style={styles.followUpLabel}>今天恢復正常了嗎？</Text>
+          <Pressable
+            style={styles.closeButton}
+            onPress={() => { void cancelFollowUp(log.id); onClose(); }}>
+            <Text style={styles.closeButtonText}>已恢復正常</Text>
+          </Pressable>
+          <Pressable
+            style={styles.secondaryButton}
+            onPress={() => { void scheduleAbnormalFollowUp(log.id); onClose(); }}>
+            <Text style={styles.secondaryButtonText}>仍在觀察中，明天再提醒</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <View style={styles.actions}>
+          <Pressable style={styles.closeButton} onPress={onClose}>
+            <Text style={styles.closeButtonText}>關閉</Text>
+          </Pressable>
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -183,6 +202,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   closeButtonText: { color: '#ffffff', fontSize: 17, fontWeight: '700' },
+  secondaryButton: {
+    alignItems: 'center',
+    backgroundColor: '#e9efed',
+    borderRadius: 16,
+    height: 54,
+    justifyContent: 'center',
+  },
+  secondaryButtonText: { color: '#3c4948', fontSize: 16, fontWeight: '700' },
   unclassifiedBox: { backgroundColor: '#f5fbf9', borderRadius: 12, gap: 10, padding: 14 },
   unclassifiedLabel: {
     color: '#6c7a78',
@@ -205,4 +232,10 @@ const styles = StyleSheet.create({
   },
   petPickerEmoji: { fontSize: 16 },
   petPickerName: { color: '#171d1c', fontSize: 14, fontWeight: '600' },
+  followUpLabel: {
+    color: '#3c4948',
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
 });

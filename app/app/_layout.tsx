@@ -7,7 +7,6 @@ import { useEffect } from 'react';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { registerForPushNotifications } from '@/lib/notifications';
 import { SessionProvider } from '@/providers/session-provider';
 
 export const unstable_settings = {
@@ -39,9 +38,6 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
 
   useEffect(() => {
-    // 請求通知權限，取得 push token（模擬器 token 為 null，真機才有）
-    void registerForPushNotifications();
-
     // addNotificationResponseReceivedListener 同時處理：
     // - app 在前景/背景時點擊通知
     // - cold start（app 被關掉後被通知叫起）
