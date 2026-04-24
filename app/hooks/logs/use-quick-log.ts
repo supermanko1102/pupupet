@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { scheduleAbnormalFollowUp } from '@/lib/notifications';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/providers/session-provider';
-import { POOP_LOGS_KEY } from './shared';
+import { poopLogsKeys } from './shared';
 import type { ManualStatus } from './shared';
 
 export type QuickLogInput = {
@@ -39,7 +39,7 @@ export function useQuickLog() {
       if (variables.manualStatus === 'abnormal' || variables.manualStatus === 'soft') {
         void scheduleAbnormalFollowUp(data.id);
       }
-      queryClient.invalidateQueries({ queryKey: [POOP_LOGS_KEY, user?.id] });
+      queryClient.invalidateQueries({ queryKey: poopLogsKeys.all(user?.id) });
     },
   });
 }

@@ -8,12 +8,12 @@ import {
   View,
 } from 'react-native';
 
-import { POOP_LOGS_KEY, useStats } from '@/hooks/use-poop-logs';
+import { effectiveRisk, poopLogsKeys, useStats } from '@/hooks/use-poop-logs';
 import { useSession } from '@/providers/session-provider';
 import type { Database } from '@/types/database';
 
 type RiskLevel = Database['public']['Tables']['poop_logs']['Row']['risk_level'];
-type ManualStatus = Database['public']['Tables']['poop_logs']['Row']['manual_status'];
+type LogRow = NonNullable<ReturnType<typeof useStats>['data']>['rows'][number];
 
 type DayActivity = {
   date: string;       // 'YYYY-MM-DD'
@@ -23,19 +23,6 @@ type DayActivity = {
 
 
 const WEEK_LABELS = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
-
-type LogRow = { captured_at: string; risk_level: RiskLevel; entry_mode: string; manual_status: ManualStatus };
-
-function effectiveRisk(row: LogRow): RiskLevel {
-  if (row.entry_mode === 'photo_ai') return row.risk_level;
-  switch (row.manual_status) {
-    case 'normal': return 'normal';
-    case 'soft':
-    case 'hard': return 'observe';
-    case 'abnormal': return 'vet';
-    default: return null;
-  }
-}
 
 function buildLast7Days(logs: LogRow[]): DayActivity[] {
   const days: DayActivity[] = [];
@@ -92,7 +79,7 @@ export function StatsPanel() {
     : null;
 
   function handleRefresh() {
-    void queryClient.invalidateQueries({ queryKey: [POOP_LOGS_KEY, user?.id, 'stats'] });
+    void queryClient.invalidateQueries({ queryKey: poopLogsKeys.stats(user?.id) });
     void refetch();
   }
 

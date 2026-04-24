@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { poopLogsKeys } from '@/hooks/logs/shared';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/providers/session-provider';
 import type { Database } from '@/types/database';
@@ -89,7 +90,7 @@ export function useAssignPet() {
     },
     onSuccess: () => {
       // 讓 recent logs 和 history 都失效，下次自動重新 fetch
-      void queryClient.invalidateQueries({ queryKey: ['poop_logs', user?.id] });
+      void queryClient.invalidateQueries({ queryKey: poopLogsKeys.all(user?.id) });
     },
   });
 }

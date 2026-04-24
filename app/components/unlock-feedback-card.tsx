@@ -11,7 +11,7 @@ export function UnlockFeedbackCard({ feedback }: { feedback: RewardFeedback }) {
   useEffect(() => {
     scale.value = withSpring(1, { damping: 14, stiffness: 180 });
     opacity.value = withDelay(50, withSpring(1, { damping: 20, stiffness: 200 }));
-  }, []);
+  }, [opacity, scale]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,

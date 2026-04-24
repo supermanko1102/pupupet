@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/providers/session-provider';
-import { effectiveRisk, POOP_LOGS_KEY } from './shared';
+import { effectiveRisk, fetchDoneLogSignals, poopLogsKeys } from './shared';
 
 export type TrendSummary = {
   message: string;
@@ -15,20 +15,11 @@ export function useTrendSummary() {
   const { user } = useSession();
 
   return useQuery({
-    queryKey: [POOP_LOGS_KEY, user?.id, 'trend'],
+    queryKey: poopLogsKeys.trend(user?.id),
     queryFn: async () => {
       if (!supabase || !user) return null;
 
-      const { data, error } = await supabase
-        .from('poop_logs')
-        .select('captured_at, risk_level, entry_mode, manual_status')
-        .eq('status', 'done')
-        .order('captured_at', { ascending: false })
-        .limit(10);
-
-      if (error) throw error;
-
-      const rows = data ?? [];
+      const rows = await fetchDoneLogSignals(10);
       if (rows.length === 0) {
         return { message: '還沒有記錄，開始第一筆吧', recentCount: 0, hasRecentAbnormal: false, lastAbnormalDaysAgo: null } satisfies TrendSummary;
       }

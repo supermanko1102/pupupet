@@ -11,6 +11,10 @@ import { uploadPoopPhoto } from '@/lib/uploads';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/providers/session-provider';
 
+const POLL_INTERVAL_MS = 2000;
+const POLL_TIMEOUT_MS = 90_000;
+const MAX_POLL_ERRORS = 3;
+
 type Props = {
   onLogsUpdated: () => void | Promise<unknown>;
   statsRows?: StatsData['rows'];
@@ -20,6 +24,9 @@ export function usePhotoAnalysisFlow({ onLogsUpdated, statsRows }: Props) {
   const { user } = useSession();
   const assignPetMutation = useAssignPet();
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollErrorCountRef = useRef(0);
+  const pollInFlightRef = useRef(false);
+  const pollStartedAtRef = useRef<number | null>(null);
 
   const [currentLogId, setCurrentLogId] = useState<string | null>(null);
   const [petAssigned, setPetAssigned] = useState(false);
@@ -32,6 +39,9 @@ export function usePhotoAnalysisFlow({ onLogsUpdated, statsRows }: Props) {
   const closePhotoModal = useCallback(() => {
     if (pollingRef.current) clearInterval(pollingRef.current);
     pollingRef.current = null;
+    pollErrorCountRef.current = 0;
+    pollInFlightRef.current = false;
+    pollStartedAtRef.current = null;
     setCapturedAsset(null);
     setModalPhase('analyzing');
     setAnalysisResult(null);
@@ -46,56 +56,112 @@ export function usePhotoAnalysisFlow({ onLogsUpdated, statsRows }: Props) {
     };
   }, []);
 
-  const startPolling = useCallback((logId: string, imagePath: string) => {
+  const showPollingFailure = useCallback((
+    summary: string,
+    previewUri: string,
+    recommendation: string | null = '你可以先離開此畫面，稍後到歷程查看是否完成分析。'
+  ) => {
     if (pollingRef.current) clearInterval(pollingRef.current);
+    pollingRef.current = null;
+    pollErrorCountRef.current = 0;
+    pollInFlightRef.current = false;
+    pollStartedAtRef.current = null;
+
+    setAnalysisResult({
+      imageUrl: previewUri,
+      bristolScore: null,
+      failed: true,
+      recommendation,
+      riskLevel: null,
+      summary,
+    });
+    setModalPhase('result');
+    void onLogsUpdated();
+  }, [onLogsUpdated]);
+
+  const startPolling = useCallback((logId: string, imagePath: string, previewUri: string) => {
+    if (pollingRef.current) clearInterval(pollingRef.current);
+    pollErrorCountRef.current = 0;
+    pollInFlightRef.current = false;
+    pollStartedAtRef.current = Date.now();
 
     pollingRef.current = setInterval(async () => {
       if (!supabase) return;
+      if (pollInFlightRef.current) return;
 
-      const { data } = await supabase
-        .from('poop_logs')
-        .select('status, bristol_score, risk_level, summary, recommendation')
-        .eq('id', logId)
-        .single();
-
-      if (data?.status === 'done' || data?.status === 'failed') {
-        if (pollingRef.current) clearInterval(pollingRef.current);
-        pollingRef.current = null;
-
-        const { data: signedData } = await supabase.storage
-          .from('poop-photos')
-          .createSignedUrl(imagePath, 60 * 60);
-
-        const resolvedRiskLevel = data.status === 'failed' ? null : data.risk_level;
-        if (data.status !== 'failed') {
-          setRewardFeedback(
-            buildRewardFeedback(statsRows ?? [], {
-              captured_at: new Date().toISOString(),
-              entry_mode: 'photo_ai',
-              manual_status: null,
-              risk_level: resolvedRiskLevel,
-            })
-          );
-        }
-
-        setAnalysisResult({
-          imageUrl: signedData?.signedUrl ?? '',
-          bristolScore: data.bristol_score,
-          failed: data.status === 'failed',
-          recommendation: data.status === 'failed' ? null : data.recommendation,
-          riskLevel: resolvedRiskLevel,
-          summary: data.status === 'failed' ? '分析失敗，請重新拍照。' : data.summary,
-        });
-
-        if (resolvedRiskLevel === 'vet' || resolvedRiskLevel === 'observe') {
-          void scheduleAbnormalFollowUp(logId);
-        }
-
-        setModalPhase('result');
-        void onLogsUpdated();
+      const startedAt = pollStartedAtRef.current ?? Date.now();
+      if (Date.now() - startedAt > POLL_TIMEOUT_MS) {
+        showPollingFailure('分析時間較長，稍後可在歷程查看結果。', previewUri);
+        return;
       }
-    }, 2000);
-  }, [onLogsUpdated, statsRows]);
+
+      pollInFlightRef.current = true;
+
+      try {
+        const { data, error } = await supabase
+          .from('poop_logs')
+          .select('status, bristol_score, risk_level, summary, recommendation')
+          .eq('id', logId)
+          .single();
+
+        if (error) {
+          pollErrorCountRef.current += 1;
+          if (pollErrorCountRef.current >= MAX_POLL_ERRORS) {
+            showPollingFailure('連線不穩，暫時無法確認分析結果。', previewUri);
+          }
+          return;
+        }
+
+        pollErrorCountRef.current = 0;
+
+        if (data?.status === 'done' || data?.status === 'failed') {
+          if (pollingRef.current) clearInterval(pollingRef.current);
+          pollingRef.current = null;
+          pollErrorCountRef.current = 0;
+          pollStartedAtRef.current = null;
+
+          const { data: signedData } = await supabase.storage
+            .from('poop-photos')
+            .createSignedUrl(imagePath, 60 * 60);
+
+          const resolvedRiskLevel = data.status === 'failed' ? null : data.risk_level;
+          if (data.status !== 'failed') {
+            setRewardFeedback(
+              buildRewardFeedback(statsRows ?? [], {
+                captured_at: new Date().toISOString(),
+                entry_mode: 'photo_ai',
+                manual_status: null,
+                risk_level: resolvedRiskLevel,
+              })
+            );
+          }
+
+          setAnalysisResult({
+            imageUrl: signedData?.signedUrl ?? previewUri,
+            bristolScore: data.bristol_score,
+            failed: data.status === 'failed',
+            recommendation: data.status === 'failed' ? null : data.recommendation,
+            riskLevel: resolvedRiskLevel,
+            summary: data.status === 'failed' ? '分析失敗，請重新拍照。' : data.summary,
+          });
+
+          if (resolvedRiskLevel === 'vet' || resolvedRiskLevel === 'observe') {
+            void scheduleAbnormalFollowUp(logId);
+          }
+
+          setModalPhase('result');
+          void onLogsUpdated();
+        }
+      } catch {
+        pollErrorCountRef.current += 1;
+        if (pollErrorCountRef.current >= MAX_POLL_ERRORS) {
+          showPollingFailure('連線不穩，暫時無法確認分析結果。', previewUri);
+        }
+      } finally {
+        pollInFlightRef.current = false;
+      }
+    }, POLL_INTERVAL_MS);
+  }, [onLogsUpdated, showPollingFailure, statsRows]);
 
   const uploadAsset = useCallback(async (asset: ImagePicker.ImagePickerAsset) => {
     if (!supabase || !user) return;
@@ -116,7 +182,7 @@ export function usePhotoAnalysisFlow({ onLogsUpdated, statsRows }: Props) {
       if (error) throw error;
 
       setCurrentLogId(newLog.id);
-      startPolling(newLog.id, newLog.image_path!);
+      startPolling(newLog.id, newLog.image_path!, asset.uri);
     } catch (error) {
       Alert.alert('上傳失敗', error instanceof Error ? error.message : '請稍後再試。');
       closePhotoModal();

@@ -4,25 +4,30 @@
 //   2. 也可從 Dashboard 手動觸發
 //
 // pg_cron 設定（在 Supabase SQL Editor 執行）：
+//   建議把 project URL 與 anon/publishable key 放在 Supabase Vault，
+//   不要把 service-role token 寫進 SQL 或 migration。
 //   select cron.schedule(
 //     'process-poop-queue',
 //     '* * * * *',   -- 每分鐘
 //     $$
 //       select net.http_post(
-//         url     := 'https://<project-ref>.supabase.co/functions/v1/process-queue',
-//         headers := '{"Authorization": "Bearer <SERVICE_ROLE_KEY>"}'::jsonb
+//         url     := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url') || '/functions/v1/process-queue',
+//         headers := jsonb_build_object(
+//           'Content-Type', 'application/json',
+//           'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'anon_key')
+//         )
 //       );
 //     $$
 //   );
 //
 // 移除：select cron.unschedule('process-poop-queue');
 
-import { processOneJob } from '../analyze-poop/index.ts';
+import { processOneJob } from '../_shared/poop-analysis.ts';
 
 const MAX_JOBS_PER_RUN = 10; // 每次最多處理幾筆，避免單次執行超時
 
 Deno.serve(async (_req) => {
-  const results: Array<{ id?: string; skipped?: boolean; error?: string }> = [];
+  const results: Array<{ success?: boolean; id?: string; skipped?: boolean; error?: string }> = [];
 
   for (let i = 0; i < MAX_JOBS_PER_RUN; i++) {
     try {
