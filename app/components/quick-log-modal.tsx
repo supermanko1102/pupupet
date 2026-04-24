@@ -12,8 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 import { modalStyles as ms } from '@/components/modal-styles';
-import { UnlockFeedbackCard } from '@/components/unlock-feedback-card';
-import type { RewardFeedback } from '@/lib/catalog';
+import { lightImpactFeedback, selectionFeedback } from '@/lib/haptics';
 import { toneBorderColor } from '@/lib/log-utils';
 import type { Database } from '@/types/database';
 
@@ -43,15 +42,21 @@ function StatusCard({ option, selected, onSelect }: StatusCardProps) {
   const scale = useSharedValue(1);
   const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
+  function handleSelect() {
+    if (!selected) selectionFeedback();
+    onSelect();
+  }
+
   return (
     <AnimatedPressable
+      android_ripple={BUTTON_RIPPLE}
       style={[
         styles.statusCard,
         selected && styles.statusCardSelected,
         selected && { borderColor: toneBorderColor(option.tone) },
         animatedStyle,
       ]}
-      onPress={onSelect}
+      onPress={handleSelect}
       onPressIn={() => { scale.value = withSpring(0.94, { damping: 15, stiffness: 300 }); }}
       onPressOut={() => { scale.value = withSpring(1, { damping: 15, stiffness: 300 }); }}>
       <Text style={styles.statusEmoji}>{option.emoji}</Text>
@@ -67,7 +72,6 @@ type Props = {
   selectedStatus: NonNullable<ManualStatus> | null;
   quickNote: string;
   quickLogDone: boolean;
-  rewardFeedback?: RewardFeedback | null;
   isPending: boolean;
   onSelectStatus: (status: NonNullable<ManualStatus>) => void;
   onChangeNote: (note: string) => void;
@@ -80,13 +84,22 @@ export function QuickLogModal({
   selectedStatus,
   quickNote,
   quickLogDone,
-  rewardFeedback,
   isPending,
   onSelectStatus,
   onChangeNote,
   onSubmit,
   onClose,
 }: Props) {
+  function handleClose() {
+    lightImpactFeedback();
+    onClose();
+  }
+
+  function handleSubmit() {
+    lightImpactFeedback();
+    onSubmit();
+  }
+
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <SafeAreaView style={ms.modalSafe}>
@@ -102,10 +115,16 @@ export function QuickLogModal({
                 <Text style={ms.trackingNoticeText}>明天會提醒你追蹤狀況</Text>
               </View>
             )}
-            {rewardFeedback ? <UnlockFeedbackCard feedback={rewardFeedback} /> : null}
             <Pressable
-              style={[ms.modalButton, ms.primaryButton, { marginTop: 24, width: '80%' }]}
-              onPress={onClose}>
+              android_ripple={BUTTON_RIPPLE_ON_DARK}
+              style={({ pressed }) => [
+                ms.modalButton,
+                ms.primaryButton,
+                { marginTop: 24, width: '80%' },
+                styles.modalButton,
+                pressed && styles.buttonPressed,
+              ]}
+              onPress={handleClose}>
               <Text style={ms.primaryButtonText}>好</Text>
             </Pressable>
           </View>
@@ -138,16 +157,31 @@ export function QuickLogModal({
 
             <View style={ms.modalActions}>
               <Pressable
-                style={[ms.modalButton, ms.primaryButton, !selectedStatus && ms.buttonDisabled]}
+                android_ripple={BUTTON_RIPPLE_ON_DARK}
+                style={({ pressed }) => [
+                  ms.modalButton,
+                  ms.primaryButton,
+                  styles.modalButton,
+                  !selectedStatus && ms.buttonDisabled,
+                  pressed && selectedStatus && !isPending && styles.buttonPressed,
+                ]}
                 disabled={!selectedStatus || isPending}
-                onPress={onSubmit}>
+                onPress={handleSubmit}>
                 {isPending ? (
                   <ActivityIndicator color="#ffffff" />
                 ) : (
                   <Text style={ms.primaryButtonText}>記錄</Text>
                 )}
               </Pressable>
-              <Pressable style={[ms.modalButton, ms.ghostButton]} onPress={onClose}>
+              <Pressable
+                android_ripple={BUTTON_RIPPLE}
+                style={({ pressed }) => [
+                  ms.modalButton,
+                  ms.ghostButton,
+                  styles.modalButton,
+                  pressed && styles.buttonPressed,
+                ]}
+                onPress={handleClose}>
                 <Text style={ms.ghostButtonText}>取消</Text>
               </Pressable>
             </View>
@@ -169,7 +203,7 @@ const styles = StyleSheet.create({
   },
   statusCard: {
     alignItems: 'center', backgroundColor: '#f5fbf9', borderColor: '#e3e9e8',
-    borderRadius: 16, borderWidth: 2, gap: 8, paddingVertical: 20, width: '44%',
+    borderRadius: 16, borderWidth: 2, gap: 8, overflow: 'hidden', paddingVertical: 20, width: '44%',
   },
   statusCardSelected: { backgroundColor: '#f0fdf9' },
   statusEmoji:        { fontSize: 36 },
@@ -182,4 +216,9 @@ const styles = StyleSheet.create({
   quickDoneContainer: { alignItems: 'center', flex: 1, justifyContent: 'center', gap: 12, paddingHorizontal: 40 },
   quickDoneEmoji:     { fontSize: 64 },
   quickDoneTitle:     { color: '#171d1c', fontSize: 24, fontWeight: '700' },
+  modalButton:        { overflow: 'hidden' },
+  buttonPressed:      { opacity: 0.72 },
 });
+
+const BUTTON_RIPPLE = { color: 'rgba(23, 29, 28, 0.08)' };
+const BUTTON_RIPPLE_ON_DARK = { color: 'rgba(255, 255, 255, 0.18)' };

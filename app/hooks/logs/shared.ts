@@ -18,6 +18,7 @@ export const HISTORY_PAGE_SIZE = 20;
 export const poopLogsKeys = {
   all: (userId?: string) => [POOP_LOGS_KEY, userId] as const,
   detail: (userId?: string, logId?: string) => [POOP_LOGS_KEY, userId, 'detail', logId] as const,
+  day: (userId?: string, dateKey?: string) => [POOP_LOGS_KEY, userId, 'day', dateKey] as const,
   history: (userId?: string) => [POOP_LOGS_KEY, userId, 'history'] as const,
   recent: (userId?: string) => [POOP_LOGS_KEY, userId, 'recent'] as const,
   stats: (userId?: string) => [POOP_LOGS_KEY, userId, 'stats'] as const,
@@ -172,6 +173,28 @@ export async function fetchHistoryLogs(offset: number): Promise<HistoryLog[]> {
     .select(LOG_WITH_PET_SELECT)
     .order('captured_at', { ascending: false })
     .range(offset, offset + HISTORY_PAGE_SIZE - 1);
+
+  if (error) throw error;
+  return mapRowsWithSignedUrls((data ?? []) as unknown as HistoryRow[]);
+}
+
+export async function fetchHistoryLogsForDate(dateKey: string): Promise<HistoryLog[]> {
+  const client = requireSupabase();
+  const [year, month, day] = dateKey.split('-').map(Number);
+
+  if (!year || !month || !day) {
+    throw new Error('日期格式不正確。');
+  }
+
+  const start = new Date(year, month - 1, day);
+  const end = new Date(year, month - 1, day + 1);
+
+  const { data, error } = await client
+    .from('poop_logs')
+    .select(LOG_WITH_PET_SELECT)
+    .gte('captured_at', start.toISOString())
+    .lt('captured_at', end.toISOString())
+    .order('captured_at', { ascending: false });
 
   if (error) throw error;
   return mapRowsWithSignedUrls((data ?? []) as unknown as HistoryRow[]);

@@ -7,7 +7,7 @@ export type { HistoryLog, LogSignal, RiskLevel, ManualStatus } from './logs/shar
 export { useRecentLogs } from './logs/use-recent-logs';
 export type { RecentLog } from './logs/use-recent-logs';
 
-export { useHistoryLogs } from './logs/use-history-logs';
+export { useHistoryLogs, useHistoryLogsForDate } from './logs/use-history-logs';
 
 export { usePoopLog } from './logs/use-poop-log';
 

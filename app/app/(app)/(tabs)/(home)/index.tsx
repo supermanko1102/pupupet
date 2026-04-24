@@ -21,7 +21,6 @@ import { usePets } from '@/hooks/use-pets';
 import { usePhotoAnalysisFlow } from '@/hooks/use-photo-analysis-flow';
 import {
   useRecentLogs,
-  useStats,
   useTrendSummary,
   type RecentLog,
 } from '@/hooks/use-poop-logs';
@@ -29,6 +28,7 @@ import { useQuickLogFlow } from '@/hooks/use-quick-log-flow';
 import {
   logStatusLabel,
 } from '@/lib/log-utils';
+import { lightImpactFeedback } from '@/lib/haptics';
 import { cancelFollowUp } from '@/lib/notifications';
 import { useSession } from '@/providers/session-provider';
 
@@ -110,14 +110,32 @@ export default function HomeScreen() {
 
   const { data: pets = [] } = usePets();
   const { data: recentLogs = [], isLoading, isRefetching, refetch: refetchLogs } = useRecentLogs();
-  const { data: statsData } = useStats();
   const { data: trendSummary } = useTrendSummary();
   const logDetailFlow = useLogDetailFlow();
-  const quickLogFlow = useQuickLogFlow({ statsRows: statsData?.rows });
+  const quickLogFlow = useQuickLogFlow();
   const photoAnalysisFlow = usePhotoAnalysisFlow({
     onLogsUpdated: refetchLogs,
-    statsRows: statsData?.rows,
   });
+
+  function handleOpenQuickLog() {
+    lightImpactFeedback();
+    quickLogFlow.openQuickLog();
+  }
+
+  function handleStartScan() {
+    lightImpactFeedback();
+    void photoAnalysisFlow.startScan();
+  }
+
+  function handlePickFromLibrary() {
+    lightImpactFeedback();
+    void photoAnalysisFlow.pickFromLibrary();
+  }
+
+  function handleOpenHistory() {
+    lightImpactFeedback();
+    router.navigate('/history' as never);
+  }
 
   return (
     <>
@@ -127,7 +145,6 @@ export default function HomeScreen() {
       analysisResult={photoAnalysisFlow.analysisResult}
       petAssigned={photoAnalysisFlow.petAssigned}
       pets={pets}
-      rewardFeedback={photoAnalysisFlow.rewardFeedback}
       onAssignPet={(petId) => void photoAnalysisFlow.assignPet(petId)}
       onClose={photoAnalysisFlow.closePhotoModal}
     />
@@ -137,7 +154,6 @@ export default function HomeScreen() {
       selectedStatus={quickLogFlow.selectedStatus}
       quickNote={quickLogFlow.quickNote}
       quickLogDone={quickLogFlow.quickLogDone}
-      rewardFeedback={quickLogFlow.rewardFeedback}
       isPending={quickLogFlow.isPending}
       onSelectStatus={quickLogFlow.setSelectedStatus}
       onChangeNote={quickLogFlow.setQuickNote}
@@ -170,7 +186,7 @@ export default function HomeScreen() {
               <View style={styles.ctaRow}>
                 <Pressable
                   style={({ pressed }) => [styles.ctaCard, styles.ctaCardPrimary, pressed && styles.ctaCardPressed]}
-                  onPress={quickLogFlow.openQuickLog}
+                  onPress={handleOpenQuickLog}
                   disabled={!user}>
                   <View style={styles.ctaIconWrap}>
                     <Ionicons name="flash" size={28} color="#ffffff" />
@@ -181,7 +197,7 @@ export default function HomeScreen() {
 
                 <Pressable
                   style={({ pressed }) => [styles.ctaCard, styles.ctaCardSecondary, pressed && styles.ctaCardPressed]}
-                  onPress={() => void photoAnalysisFlow.startScan()}
+                  onPress={handleStartScan}
                   disabled={photoAnalysisFlow.isUploading || !user}>
                   <View style={[styles.ctaIconWrap, { backgroundColor: 'rgba(32,178,170,0.12)' }]}>
                     <Ionicons name="camera" size={28} color="#20B2AA" />
@@ -192,8 +208,9 @@ export default function HomeScreen() {
               </View>
 
               <Pressable
-                style={styles.libraryButton}
-                onPress={() => void photoAnalysisFlow.pickFromLibrary()}
+                android_ripple={BUTTON_RIPPLE}
+                style={({ pressed }) => [styles.libraryButton, pressed && styles.buttonPressed]}
+                onPress={handlePickFromLibrary}
                 disabled={photoAnalysisFlow.isUploading || !user}>
                 <Ionicons name="images-outline" size={16} color="#6c7a78" />
                 <Text style={styles.libraryButtonText}>從相簿選擇</Text>
@@ -224,14 +241,14 @@ export default function HomeScreen() {
 
                   <View style={styles.summaryActionRow}>
                     <Pressable
-                      style={[styles.summaryActionButton, styles.summaryActionPrimary]}
-                      onPress={() => router.navigate('/history' as never)}>
-                      <Text style={styles.summaryActionPrimaryText}>看歷程</Text>
-                    </Pressable>
-                    <Pressable
-                      style={[styles.summaryActionButton, styles.summaryActionSecondary]}
-                      onPress={() => router.navigate('/catalog' as never)}>
-                      <Text style={styles.summaryActionSecondaryText}>看圖鑑</Text>
+                      android_ripple={BUTTON_RIPPLE_ON_DARK}
+                      style={({ pressed }) => [
+                        styles.summaryActionButton,
+                        styles.summaryActionPrimary,
+                        pressed && styles.buttonPressed,
+                      ]}
+                      onPress={handleOpenHistory}>
+                      <Text style={styles.summaryActionPrimaryText}>看完整歷程</Text>
                     </Pressable>
                   </View>
                 </View>
@@ -268,6 +285,9 @@ export default function HomeScreen() {
 
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
+
+const BUTTON_RIPPLE = { color: 'rgba(23, 29, 28, 0.08)' };
+const BUTTON_RIPPLE_ON_DARK = { color: 'rgba(255, 255, 255, 0.18)' };
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
@@ -323,6 +343,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 6,
     marginBottom: 32,
+    overflow: 'hidden',
+    borderRadius: 999,
+    paddingHorizontal: 12,
     paddingVertical: 8,
   },
   libraryButtonText: { color: '#6c7a78', fontSize: 14, fontWeight: '500' },
@@ -356,12 +379,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     minHeight: 46,
+    overflow: 'hidden',
     paddingHorizontal: 14,
   },
   summaryActionPrimary: { backgroundColor: '#20B2AA' },
-  summaryActionSecondary: { backgroundColor: '#e9efed' },
   summaryActionPrimaryText: { color: '#ffffff', fontSize: 15, fontWeight: '700' },
-  summaryActionSecondaryText: { color: '#3c4948', fontSize: 15, fontWeight: '700' },
+  buttonPressed: { opacity: 0.72 },
   emptyState: { alignItems: 'center', gap: 12, marginTop: 24, paddingHorizontal: 40 },
   emptyText: { color: '#6c7a78', fontSize: 15, lineHeight: 22, textAlign: 'center' },
 

@@ -28,7 +28,6 @@ export default function AppLayout() {
           const iconMap: Record<string, ComponentProps<typeof Ionicons>['name']> = {
             '(home)': focused ? 'flash' : 'flash-outline',
             history: focused ? 'time' : 'time-outline',
-            catalog: focused ? 'sparkles' : 'sparkles-outline',
           };
 
           return <Ionicons color={color} name={iconMap[route.name]} size={size} />;
@@ -36,7 +35,6 @@ export default function AppLayout() {
       })}>
       <Tabs.Screen name="(home)" options={{ title: '記錄' }} />
       <Tabs.Screen name="history" options={{ title: '歷程' }} />
-      <Tabs.Screen name="catalog" options={{ title: '圖鑑' }} />
     </Tabs>
   );
 }

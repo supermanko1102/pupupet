@@ -4,8 +4,6 @@ import { Alert } from 'react-native';
 
 import type { AnalysisResult } from '@/components/photo-analysis-modal';
 import { useAssignPet } from '@/hooks/use-pets';
-import type { StatsData } from '@/hooks/use-poop-logs';
-import { buildRewardFeedback, type RewardFeedback } from '@/lib/catalog';
 import { scheduleAbnormalFollowUp } from '@/lib/notifications';
 import { uploadPoopPhoto } from '@/lib/uploads';
 import { supabase } from '@/lib/supabase';
@@ -17,10 +15,9 @@ const MAX_POLL_ERRORS = 3;
 
 type Props = {
   onLogsUpdated: () => void | Promise<unknown>;
-  statsRows?: StatsData['rows'];
 };
 
-export function usePhotoAnalysisFlow({ onLogsUpdated, statsRows }: Props) {
+export function usePhotoAnalysisFlow({ onLogsUpdated }: Props) {
   const { user } = useSession();
   const assignPetMutation = useAssignPet();
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -34,7 +31,6 @@ export function usePhotoAnalysisFlow({ onLogsUpdated, statsRows }: Props) {
   const [capturedAsset, setCapturedAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [modalPhase, setModalPhase] = useState<'analyzing' | 'result'>('analyzing');
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
-  const [rewardFeedback, setRewardFeedback] = useState<RewardFeedback | null>(null);
 
   const closePhotoModal = useCallback(() => {
     if (pollingRef.current) clearInterval(pollingRef.current);
@@ -47,7 +43,6 @@ export function usePhotoAnalysisFlow({ onLogsUpdated, statsRows }: Props) {
     setAnalysisResult(null);
     setCurrentLogId(null);
     setPetAssigned(false);
-    setRewardFeedback(null);
   }, []);
 
   useEffect(() => {
@@ -125,16 +120,6 @@ export function usePhotoAnalysisFlow({ onLogsUpdated, statsRows }: Props) {
             .createSignedUrl(imagePath, 60 * 60);
 
           const resolvedRiskLevel = data.status === 'failed' ? null : data.risk_level;
-          if (data.status !== 'failed') {
-            setRewardFeedback(
-              buildRewardFeedback(statsRows ?? [], {
-                captured_at: new Date().toISOString(),
-                entry_mode: 'photo_ai',
-                manual_status: null,
-                risk_level: resolvedRiskLevel,
-              })
-            );
-          }
 
           setAnalysisResult({
             imageUrl: signedData?.signedUrl ?? previewUri,
@@ -161,7 +146,7 @@ export function usePhotoAnalysisFlow({ onLogsUpdated, statsRows }: Props) {
         pollInFlightRef.current = false;
       }
     }, POLL_INTERVAL_MS);
-  }, [onLogsUpdated, showPollingFailure, statsRows]);
+  }, [onLogsUpdated, showPollingFailure]);
 
   const uploadAsset = useCallback(async (asset: ImagePicker.ImagePickerAsset) => {
     if (!supabase || !user) return;
@@ -169,7 +154,6 @@ export function usePhotoAnalysisFlow({ onLogsUpdated, statsRows }: Props) {
     setCapturedAsset(asset);
     setModalPhase('analyzing');
     setIsUploading(true);
-    setRewardFeedback(null);
 
     try {
       const imagePath = await uploadPoopPhoto(user.id, asset);
@@ -243,7 +227,6 @@ export function usePhotoAnalysisFlow({ onLogsUpdated, statsRows }: Props) {
     modalPhase,
     petAssigned,
     pickFromLibrary,
-    rewardFeedback,
     startScan,
   };
 }

@@ -13,8 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 import { modalStyles as ms } from '@/components/modal-styles';
-import { UnlockFeedbackCard } from '@/components/unlock-feedback-card';
-import type { RewardFeedback } from '@/lib/catalog';
+import { lightImpactFeedback, selectionFeedback } from '@/lib/haptics';
 import { riskBannerStyle, riskIcon, riskTitle } from '@/lib/log-utils';
 import type { Database } from '@/types/database';
 
@@ -36,7 +35,6 @@ type Props = {
   analysisResult: AnalysisResult | null;
   petAssigned: boolean;
   pets: Pet[];
-  rewardFeedback?: RewardFeedback | null;
   onAssignPet: (petId: string) => void;
   onClose: () => void;
 };
@@ -47,10 +45,19 @@ export function PhotoAnalysisModal({
   analysisResult,
   petAssigned,
   pets,
-  rewardFeedback,
   onAssignPet,
   onClose,
 }: Props) {
+  function handleAssignPet(petId: string) {
+    selectionFeedback();
+    onAssignPet(petId);
+  }
+
+  function handleClose() {
+    lightImpactFeedback();
+    onClose();
+  }
+
   return (
     <Modal visible={!!capturedAsset} animationType="slide" presentationStyle="pageSheet">
       <SafeAreaView style={ms.modalSafe}>
@@ -103,8 +110,6 @@ export function PhotoAnalysisModal({
                 </View>
               )}
 
-              {rewardFeedback ? <UnlockFeedbackCard feedback={rewardFeedback} /> : null}
-
               {!analysisResult.failed && (
                 <View style={styles.petPickerSection}>
                   {petAssigned ? (
@@ -117,8 +122,12 @@ export function PhotoAnalysisModal({
                           {pets.map((pet) => (
                             <Pressable
                               key={pet.id}
-                              style={styles.petPickerButton}
-                              onPress={() => onAssignPet(pet.id)}>
+                              android_ripple={BUTTON_RIPPLE}
+                              style={({ pressed }) => [
+                                styles.petPickerButton,
+                                pressed && styles.buttonPressed,
+                              ]}
+                              onPress={() => handleAssignPet(pet.id)}>
                               <Text style={styles.petPickerEmoji}>
                                 {pet.species === 'dog' ? '🐶' : pet.species === 'cat' ? '🐱' : '🐾'}
                               </Text>
@@ -127,7 +136,10 @@ export function PhotoAnalysisModal({
                           ))}
                         </View>
                       )}
-                      <Pressable onPress={onClose}>
+                      <Pressable
+                        android_ripple={BUTTON_RIPPLE}
+                        style={({ pressed }) => [styles.petPickerSkipButton, pressed && styles.buttonPressed]}
+                        onPress={handleClose}>
                         <Text style={styles.petPickerSkip}>略過，之後再分類</Text>
                       </Pressable>
                     </>
@@ -138,7 +150,15 @@ export function PhotoAnalysisModal({
 
             <View style={ms.modalActions}>
               {(petAssigned || analysisResult.failed) && (
-                <Pressable style={[ms.modalButton, ms.primaryButton]} onPress={onClose}>
+                <Pressable
+                  android_ripple={BUTTON_RIPPLE_ON_DARK}
+                  style={({ pressed }) => [
+                    ms.modalButton,
+                    ms.primaryButton,
+                    styles.modalButton,
+                    pressed && styles.buttonPressed,
+                  ]}
+                  onPress={handleClose}>
                   <Text style={ms.primaryButtonText}>完成</Text>
                 </Pressable>
               )}
@@ -171,10 +191,16 @@ const styles = StyleSheet.create({
   petPickerButton: {
     alignItems: 'center', backgroundColor: '#f5fbf9', borderColor: '#e3e9e8',
     borderRadius: 12, borderWidth: 1, flexDirection: 'row',
-    gap: 6, paddingHorizontal: 14, paddingVertical: 10,
+    gap: 6, overflow: 'hidden', paddingHorizontal: 14, paddingVertical: 10,
   },
   petPickerEmoji: { fontSize: 18 },
   petPickerName:  { color: '#171d1c', fontSize: 15, fontWeight: '600' },
+  petPickerSkipButton: { borderRadius: 999, overflow: 'hidden', paddingVertical: 8 },
   petPickerSkip:  { color: '#bbc9c7', fontSize: 14, textAlign: 'center' },
   petPickerDone:  { color: '#16a34a', fontSize: 14, fontWeight: '600', textAlign: 'center' },
+  modalButton:    { overflow: 'hidden' },
+  buttonPressed:  { opacity: 0.72 },
 });
+
+const BUTTON_RIPPLE = { color: 'rgba(23, 29, 28, 0.08)' };
+const BUTTON_RIPPLE_ON_DARK = { color: 'rgba(255, 255, 255, 0.18)' };
