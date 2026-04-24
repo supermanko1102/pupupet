@@ -7,6 +7,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -15,6 +16,8 @@ import { UnlockFeedbackCard } from '@/components/unlock-feedback-card';
 import type { RewardFeedback } from '@/lib/catalog';
 import { toneBorderColor } from '@/lib/log-utils';
 import type { Database } from '@/types/database';
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 type ManualStatus = Database['public']['Tables']['poop_logs']['Row']['manual_status'];
 
@@ -29,6 +32,35 @@ const QUICK_STATUS_OPTIONS: {
   { value: 'hard',     label: '偏硬', emoji: '🟤', tone: 'warning' },
   { value: 'abnormal', label: '異常', emoji: '🚨', tone: 'danger' },
 ];
+
+type StatusCardProps = {
+  option: (typeof QUICK_STATUS_OPTIONS)[number];
+  selected: boolean;
+  onSelect: () => void;
+};
+
+function StatusCard({ option, selected, onSelect }: StatusCardProps) {
+  const scale = useSharedValue(1);
+  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+
+  return (
+    <AnimatedPressable
+      style={[
+        styles.statusCard,
+        selected && styles.statusCardSelected,
+        selected && { borderColor: toneBorderColor(option.tone) },
+        animatedStyle,
+      ]}
+      onPress={onSelect}
+      onPressIn={() => { scale.value = withSpring(0.94, { damping: 15, stiffness: 300 }); }}
+      onPressOut={() => { scale.value = withSpring(1, { damping: 15, stiffness: 300 }); }}>
+      <Text style={styles.statusEmoji}>{option.emoji}</Text>
+      <Text style={[styles.statusLabel, selected && { color: '#171d1c', fontWeight: '700' }]}>
+        {option.label}
+      </Text>
+    </AnimatedPressable>
+  );
+}
 
 type Props = {
   visible: boolean;
@@ -84,19 +116,12 @@ export function QuickLogModal({
 
             <View style={styles.statusGrid}>
               {QUICK_STATUS_OPTIONS.map((opt) => (
-                <Pressable
+                <StatusCard
                   key={opt.value}
-                  style={[
-                    styles.statusCard,
-                    selectedStatus === opt.value && styles.statusCardSelected,
-                    selectedStatus === opt.value && { borderColor: toneBorderColor(opt.tone) },
-                  ]}
-                  onPress={() => onSelectStatus(opt.value)}>
-                  <Text style={styles.statusEmoji}>{opt.emoji}</Text>
-                  <Text style={[styles.statusLabel, selectedStatus === opt.value && { color: '#171d1c', fontWeight: '700' }]}>
-                    {opt.label}
-                  </Text>
-                </Pressable>
+                  option={opt}
+                  selected={selectedStatus === opt.value}
+                  onSelect={() => onSelectStatus(opt.value)}
+                />
               ))}
             </View>
 

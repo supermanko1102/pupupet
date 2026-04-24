@@ -1,3 +1,4 @@
+import { StatusColors } from '@/constants/theme';
 import type { Database } from '@/types/database';
 
 type RiskLevel = Database['public']['Tables']['poop_logs']['Row']['risk_level'];
@@ -24,10 +25,10 @@ export function manualStatusEmoji(status: ManualStatus): string {
 }
 
 export function manualStatusBg(status: ManualStatus): string {
-  if (status === 'normal') return '#d8f3e8';
-  if (status === 'soft' || status === 'hard') return '#fef3c7';
-  if (status === 'abnormal') return '#fde8e8';
-  return '#e9efed';
+  if (status === 'normal') return StatusColors.normal.bg;
+  if (status === 'soft' || status === 'hard') return StatusColors.observe.bg;
+  if (status === 'abnormal') return StatusColors.vet.bg;
+  return StatusColors.neutral.bg;
 }
 
 // ─── Risk Level ───────────────────────────────────────────────────────────────
@@ -51,10 +52,14 @@ export function riskBannerStyle(riskLevel: RiskLevel): {
   borderColor: string;
   textColor: string;
 } {
-  if (riskLevel === 'normal') return { backgroundColor: '#d8f3e8', borderColor: '#6ee7b7', textColor: '#065f46' };
-  if (riskLevel === 'observe') return { backgroundColor: '#fef3c7', borderColor: '#fcd34d', textColor: '#92400e' };
-  if (riskLevel === 'vet') return { backgroundColor: '#fde8e8', borderColor: '#fca5a5', textColor: '#9a3412' };
-  return { backgroundColor: '#e9efed', borderColor: '#bbc9c7', textColor: '#3c4948' };
+  const c = riskLevel === 'normal'
+    ? StatusColors.normal
+    : riskLevel === 'observe'
+    ? StatusColors.observe
+    : riskLevel === 'vet'
+    ? StatusColors.vet
+    : StatusColors.neutral;
+  return { backgroundColor: c.bg, borderColor: c.border, textColor: c.text };
 }
 
 // ─── Log Status (unified for both entry modes) ────────────────────────────────
@@ -91,8 +96,8 @@ export function logStatusTone(log: LogLike): LogTone {
 // ─── Tone border ──────────────────────────────────────────────────────────────
 
 export function toneBorderColor(tone: LogTone): string {
-  if (tone === 'success') return '#6ee7b7';
-  if (tone === 'warning') return '#fcd34d';
-  if (tone === 'danger') return '#fca5a5';
-  return '#bbc9c7';
+  if (tone === 'success') return StatusColors.normal.border;
+  if (tone === 'warning') return StatusColors.observe.border;
+  if (tone === 'danger') return StatusColors.vet.border;
+  return StatusColors.neutral.border;
 }

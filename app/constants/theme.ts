@@ -27,6 +27,38 @@ export const Colors = {
   },
 };
 
+// ─── Brand ───────────────────────────────────────────────────────────────────
+// Single source of truth for PupuPet's brand palette.
+export const Brand = {
+  primary: '#20B2AA',
+  secondary: '#93a4a1',
+} as const;
+
+// ─── Status tokens ────────────────────────────────────────────────────────────
+// Used by log-utils, status-pill, and any risk/tone display.
+export const StatusColors = {
+  normal: {
+    bg: '#d8f3e8',
+    border: '#6ee7b7',
+    text: '#065f46',
+  },
+  observe: {
+    bg: '#fef3c7',
+    border: '#fcd34d',
+    text: '#92400e',
+  },
+  vet: {
+    bg: '#fde8e8',
+    border: '#fca5a5',
+    text: '#9a3412',
+  },
+  neutral: {
+    bg: '#e9efed',
+    border: '#bbc9c7',
+    text: '#3c4948',
+  },
+} as const;
+
 export const Fonts = Platform.select({
   ios: {
     /** iOS `UIFontDescriptorSystemDesignDefault` */

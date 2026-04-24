@@ -1,12 +1,13 @@
 import { StyleSheet, Text, View } from 'react-native';
 
+import { StatusColors } from '@/constants/theme';
 import type { LogTone } from '@/lib/log-utils';
 
 const TONE_COLORS: Record<LogTone, { bg: string; text: string }> = {
-  danger:  { bg: '#fde8e8', text: '#9a3412' },
-  neutral: { bg: '#e9efed', text: '#3c4948' },
-  success: { bg: '#d8f3e8', text: '#166534' },
-  warning: { bg: '#fef3c7', text: '#92400e' },
+  danger:  { bg: StatusColors.vet.bg,     text: StatusColors.vet.text },
+  neutral: { bg: StatusColors.neutral.bg, text: StatusColors.neutral.text },
+  success: { bg: StatusColors.normal.bg,  text: StatusColors.normal.text },
+  warning: { bg: StatusColors.observe.bg, text: StatusColors.observe.text },
 };
 
 export function StatusPill({ label, tone }: { label: string; tone: LogTone }) {

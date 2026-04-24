@@ -1,10 +1,25 @@
+import { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withDelay, withSpring } from 'react-native-reanimated';
 
 import type { RewardFeedback } from '@/lib/catalog';
 
 export function UnlockFeedbackCard({ feedback }: { feedback: RewardFeedback }) {
+  const scale = useSharedValue(0.6);
+  const opacity = useSharedValue(0);
+
+  useEffect(() => {
+    scale.value = withSpring(1, { damping: 14, stiffness: 180 });
+    opacity.value = withDelay(50, withSpring(1, { damping: 20, stiffness: 200 }));
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ scale: scale.value }],
+  }));
+
   return (
-    <View style={styles.card}>
+    <Animated.View style={[styles.card, animatedStyle]}>
       <View style={styles.iconWrap}>
         <Text style={styles.emoji}>{feedback.emoji}</Text>
       </View>
@@ -14,7 +29,7 @@ export function UnlockFeedbackCard({ feedback }: { feedback: RewardFeedback }) {
           {feedback.body}
         </Text>
       </View>
-    </View>
+    </Animated.View>
   );
 }
 
