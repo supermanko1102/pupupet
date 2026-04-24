@@ -1,12 +1,12 @@
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL?.trim() ?? '';
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY?.trim() ?? '';
+const supabasePublishableKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ?? '';
 
 export const env = {
   supabaseUrl,
-  supabaseAnonKey,
+  supabasePublishableKey,
 };
 
-export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+export const isSupabaseConfigured = Boolean(supabaseUrl && supabasePublishableKey);
 
 function maskValue(value: string, visibleLength = 10) {
   if (!value) {
@@ -25,13 +25,13 @@ export function getSupabaseConfigError() {
     return null;
   }
 
-  return '缺少 EXPO_PUBLIC_SUPABASE_URL 或 EXPO_PUBLIC_SUPABASE_ANON_KEY。';
+  return '缺少 EXPO_PUBLIC_SUPABASE_URL 或 EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY。';
 }
 
 export function getSupabaseConfigDiagnostics() {
   return {
-    anonKeyPresent: Boolean(supabaseAnonKey),
-    anonKeyPreview: maskValue(supabaseAnonKey, 14),
+    publishableKeyPresent: Boolean(supabasePublishableKey),
+    publishableKeyPreview: maskValue(supabasePublishableKey, 14),
     urlPresent: Boolean(supabaseUrl),
     urlPreview: maskValue(supabaseUrl, 36),
   };

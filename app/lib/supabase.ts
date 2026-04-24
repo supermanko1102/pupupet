@@ -24,7 +24,7 @@ const ssrSafeStorage = {
 };
 
 export const supabase = isSupabaseConfigured
-  ? createClient<Database>(env.supabaseUrl, env.supabaseAnonKey, {
+  ? createClient<Database>(env.supabaseUrl, env.supabasePublishableKey, {
       auth: {
         storage: ssrSafeStorage,
         autoRefreshToken: true,
