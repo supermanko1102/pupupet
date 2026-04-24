@@ -20,7 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LogDetailModal, type DetailLog } from '@/components/log-detail-modal';
 import { PhotoAnalysisModal, type AnalysisResult } from '@/components/photo-analysis-modal';
 import { QuickLogModal } from '@/components/quick-log-modal';
-import { SettingsPanel } from '@/components/settings-panel';
+import { SettingsPanel } from '@/components/settings';
 import { StatusPill } from '@/components/status-pill';
 
 import { Colors } from '@/constants/theme';
