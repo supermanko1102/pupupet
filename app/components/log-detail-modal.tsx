@@ -36,82 +36,88 @@ type Props = {
   onClose: () => void;
 };
 
+export function LogDetailContent({ log, isFollowUp = false, onClose }: Props) {
+  if (!log) return null;
+
+  return (
+    <ScrollView style={ms.resultScroll} contentContainerStyle={ms.resultContent}>
+      {log.entryMode === 'quick_log' ? (
+        <View style={[styles.quickBanner, { backgroundColor: manualStatusBg(log.manualStatus) }]}>
+          <Text style={styles.quickEmoji}>{manualStatusEmoji(log.manualStatus)}</Text>
+          <Text style={styles.quickLabel}>{manualStatusLabel(log.manualStatus)}</Text>
+        </View>
+      ) : log.imageUrl ? (
+        <Image source={{ uri: log.imageUrl }} style={ms.resultImage} contentFit="cover" />
+      ) : null}
+
+      <View style={ms.resultBody}>
+        {log.entryMode === 'photo_ai' && (
+          <View style={[ms.riskBanner, riskBannerStyle(log.riskLevel)]}>
+            <Text style={ms.riskBannerIcon}>{riskIcon(log.riskLevel)}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={[ms.riskBannerTitle, { color: riskBannerStyle(log.riskLevel).textColor }]}>
+                {riskTitle(log.riskLevel)}
+              </Text>
+              {log.summary ? (
+                <Text style={[ms.riskBannerSub, { color: riskBannerStyle(log.riskLevel).textColor }]}>
+                  {log.summary}
+                </Text>
+              ) : null}
+            </View>
+          </View>
+        )}
+
+        {log.note && (
+          <View style={ms.recommendBox}>
+            <Text style={ms.recommendLabel}>備註</Text>
+            <Text style={ms.recommendText}>{log.note}</Text>
+          </View>
+        )}
+
+        <View style={styles.infoRow}>
+          <Text style={styles.infoLabel}>寵物</Text>
+          <Text style={styles.infoValue}>{log.petName}</Text>
+        </View>
+        <View style={styles.infoRow}>
+          <Text style={styles.infoLabel}>時間</Text>
+          <Text style={styles.infoValue}>{new Date(log.capturedAt).toLocaleString('zh-TW')}</Text>
+        </View>
+        <View style={styles.infoRow}>
+          <Text style={styles.infoLabel}>記錄方式</Text>
+          <Text style={styles.infoValue}>{log.entryMode === 'quick_log' ? '快速記錄' : '拍照分析'}</Text>
+        </View>
+      </View>
+
+      {isFollowUp && log.riskLevel !== 'normal' ? (
+        <View style={ms.modalActions}>
+          <Text style={styles.followUpLabel}>今天恢復正常了嗎？</Text>
+          <Pressable
+            style={[ms.modalButton, ms.primaryButton]}
+            onPress={() => { void cancelFollowUp(log.id); onClose(); }}>
+            <Text style={ms.primaryButtonText}>已恢復正常</Text>
+          </Pressable>
+          <Pressable
+            style={[ms.modalButton, ms.ghostButton]}
+            onPress={() => { void scheduleAbnormalFollowUp(log.id); onClose(); }}>
+            <Text style={ms.ghostButtonText}>仍在觀察中，明天再提醒</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <View style={ms.modalActions}>
+          <Pressable style={[ms.modalButton, ms.primaryButton]} onPress={onClose}>
+            <Text style={ms.primaryButtonText}>關閉</Text>
+          </Pressable>
+        </View>
+      )}
+    </ScrollView>
+  );
+}
+
 export function LogDetailModal({ log, isFollowUp = false, onClose }: Props) {
   return (
     <Modal visible={!!log} animationType="slide" presentationStyle="pageSheet">
       <SafeAreaView style={ms.modalSafe}>
-        {log && (
-          <ScrollView style={ms.resultScroll} contentContainerStyle={ms.resultContent}>
-            {log.entryMode === 'quick_log' ? (
-              <View style={[styles.quickBanner, { backgroundColor: manualStatusBg(log.manualStatus) }]}>
-                <Text style={styles.quickEmoji}>{manualStatusEmoji(log.manualStatus)}</Text>
-                <Text style={styles.quickLabel}>{manualStatusLabel(log.manualStatus)}</Text>
-              </View>
-            ) : log.imageUrl ? (
-              <Image source={{ uri: log.imageUrl }} style={ms.resultImage} contentFit="cover" />
-            ) : null}
-
-            <View style={ms.resultBody}>
-              {log.entryMode === 'photo_ai' && (
-                <View style={[ms.riskBanner, riskBannerStyle(log.riskLevel)]}>
-                  <Text style={ms.riskBannerIcon}>{riskIcon(log.riskLevel)}</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[ms.riskBannerTitle, { color: riskBannerStyle(log.riskLevel).textColor }]}>
-                      {riskTitle(log.riskLevel)}
-                    </Text>
-                    {log.summary ? (
-                      <Text style={[ms.riskBannerSub, { color: riskBannerStyle(log.riskLevel).textColor }]}>
-                        {log.summary}
-                      </Text>
-                    ) : null}
-                  </View>
-                </View>
-              )}
-
-              {log.note && (
-                <View style={ms.recommendBox}>
-                  <Text style={ms.recommendLabel}>備註</Text>
-                  <Text style={ms.recommendText}>{log.note}</Text>
-                </View>
-              )}
-
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>寵物</Text>
-                <Text style={styles.infoValue}>{log.petName}</Text>
-              </View>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>時間</Text>
-                <Text style={styles.infoValue}>{new Date(log.capturedAt).toLocaleString('zh-TW')}</Text>
-              </View>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>記錄方式</Text>
-                <Text style={styles.infoValue}>{log.entryMode === 'quick_log' ? '快速記錄' : '拍照分析'}</Text>
-              </View>
-            </View>
-
-            {isFollowUp && log.riskLevel !== 'normal' ? (
-              <View style={ms.modalActions}>
-                <Text style={styles.followUpLabel}>今天恢復正常了嗎？</Text>
-                <Pressable
-                  style={[ms.modalButton, ms.primaryButton]}
-                  onPress={() => { void cancelFollowUp(log.id); onClose(); }}>
-                  <Text style={ms.primaryButtonText}>已恢復正常</Text>
-                </Pressable>
-                <Pressable
-                  style={[ms.modalButton, ms.ghostButton]}
-                  onPress={() => { void scheduleAbnormalFollowUp(log.id); onClose(); }}>
-                  <Text style={ms.ghostButtonText}>仍在觀察中，明天再提醒</Text>
-                </Pressable>
-              </View>
-            ) : (
-              <View style={ms.modalActions}>
-                <Pressable style={[ms.modalButton, ms.primaryButton]} onPress={onClose}>
-                  <Text style={ms.primaryButtonText}>關閉</Text>
-                </Pressable>
-              </View>
-            )}
-          </ScrollView>
-        )}
+        <LogDetailContent log={log} isFollowUp={isFollowUp} onClose={onClose} />
       </SafeAreaView>
     </Modal>
   );

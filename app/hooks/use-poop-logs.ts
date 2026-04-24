@@ -120,6 +120,44 @@ export type HistoryLog = {
   summary: string | null;
 };
 
+type HistoryRow = {
+  captured_at: string;
+  entry_mode: string | null;
+  id: string;
+  image_path: string | null;
+  manual_status: ManualStatus;
+  note: string | null;
+  pet_id: string | null;
+  pets: { name: string } | null;
+  recommendation: string | null;
+  risk_level: RiskLevel;
+  status: string;
+  summary: string | null;
+};
+
+function mapHistoryRow(row: HistoryRow, signedUrlMap: Map<string, string>): HistoryLog {
+  const petName =
+    row.pets && typeof row.pets === 'object' && 'name' in row.pets
+      ? row.pets.name
+      : '未分類';
+
+  return {
+    capturedAt: row.captured_at,
+    entryMode: (row.entry_mode ?? 'photo_ai') as 'quick_log' | 'photo_ai',
+    id: row.id,
+    imagePath: row.image_path ?? null,
+    imageUrl: row.image_path ? (signedUrlMap.get(row.image_path) ?? null) : null,
+    manualStatus: row.manual_status as ManualStatus,
+    note: row.note ?? null,
+    petId: row.pet_id ?? null,
+    petName,
+    recommendation: row.recommendation ?? null,
+    riskLevel: row.risk_level,
+    status: row.status,
+    summary: row.summary ?? null,
+  };
+}
+
 export function useHistoryLogs() {
   const { user } = useSession();
 
@@ -140,34 +178,38 @@ export function useHistoryLogs() {
 
       const signedUrlMap = await batchSignedUrls((rows ?? []).map((r) => r.image_path));
 
-      return (rows ?? []).map((row): HistoryLog => {
-        const petName =
-          row.pets && typeof row.pets === 'object' && 'name' in row.pets
-            ? (row.pets as { name: string }).name
-            : '未分類';
-
-        return {
-          capturedAt: row.captured_at,
-          entryMode: (row.entry_mode ?? 'photo_ai') as 'quick_log' | 'photo_ai',
-          id: row.id,
-          imagePath: row.image_path ?? null,
-          imageUrl: row.image_path ? (signedUrlMap.get(row.image_path) ?? null) : null,
-          manualStatus: row.manual_status as ManualStatus,
-          note: row.note ?? null,
-          petId: row.pet_id ?? null,
-          petName,
-          recommendation: row.recommendation ?? null,
-          riskLevel: row.risk_level,
-          status: row.status,
-          summary: row.summary ?? null,
-        };
-      });
+      return (rows ?? []).map((row) => mapHistoryRow(row as HistoryRow, signedUrlMap));
     },
     getNextPageParam: (lastPage, allPages) => {
       if (lastPage.length < HISTORY_PAGE_SIZE) return undefined;
       return allPages.reduce((sum, page) => sum + page.length, 0);
     },
     enabled: !!user && !!supabase,
+    staleTime: 30_000,
+  });
+}
+
+export function usePoopLog(logId?: string) {
+  const { user } = useSession();
+
+  return useQuery({
+    queryKey: [POOP_LOGS_KEY, user?.id, 'detail', logId],
+    queryFn: async () => {
+      if (!supabase || !user || !logId) return null;
+
+      const { data: row, error } = await supabase
+        .from('poop_logs')
+        .select('id, captured_at, image_path, status, summary, recommendation, risk_level, pet_id, entry_mode, manual_status, note, pets(name)')
+        .eq('id', logId)
+        .single();
+
+      if (error) throw error;
+      if (!row) return null;
+
+      const signedUrlMap = await batchSignedUrls([row.image_path]);
+      return mapHistoryRow(row as HistoryRow, signedUrlMap);
+    },
+    enabled: !!user && !!supabase && !!logId,
     staleTime: 30_000,
   });
 }

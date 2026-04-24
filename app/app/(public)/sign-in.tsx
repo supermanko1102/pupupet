@@ -13,7 +13,7 @@ export default function SignInScreen() {
   const { isReady, user } = useSession();
 
   if (isReady && user) {
-    return <Redirect href="/(tabs)" />;
+    return <Redirect href="/" />;
   }
 
   return (

@@ -11,7 +11,7 @@ import { registerForPushNotifications } from '@/lib/notifications';
 import { SessionProvider } from '@/providers/session-provider';
 
 export const unstable_settings = {
-  anchor: '(tabs)',
+  anchor: '(app)',
 };
 
 const queryClient = new QueryClient({
@@ -25,7 +25,7 @@ const queryClient = new QueryClient({
 });
 
 function navigateToFollowUp(logId: string) {
-  router.navigate({ pathname: '/', params: { trackLogId: logId } });
+  router.navigate(`/follow-up/${logId}` as never);
 }
 
 function handleNotificationResponse(response: Notifications.NotificationResponse) {
@@ -54,10 +54,8 @@ export default function RootLayout() {
       <SessionProvider>
         <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
           <Stack>
-            <Stack.Screen name="sign-in" options={{ headerShown: false }} />
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="settings" options={{ headerShown: false, presentation: 'modal' }} />
-            <Stack.Screen name="modal" options={{ presentation: 'modal', title: '關於 PupuPet' }} />
+            <Stack.Screen name="(public)" options={{ headerShown: false }} />
+            <Stack.Screen name="(app)" options={{ headerShown: false }} />
           </Stack>
           <StatusBar style="auto" />
         </ThemeProvider>

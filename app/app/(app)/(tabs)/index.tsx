@@ -1,8 +1,6 @@
-import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Notifications from 'expo-notifications';
-import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { router } from 'expo-router';
 import {
   Alert,
   Pressable,
@@ -16,27 +14,23 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 import { LogDetailModal, type DetailLog } from '@/components/log-detail-modal';
-import { PhotoAnalysisModal, type AnalysisResult } from '@/components/photo-analysis-modal';
+import { PhotoAnalysisModal } from '@/components/photo-analysis-modal';
 import { QuickLogModal } from '@/components/quick-log-modal';
-import { usePets, useAssignPet } from '@/hooks/use-pets';
+import { useLogDetailFlow } from '@/hooks/use-log-detail-flow';
+import { usePets } from '@/hooks/use-pets';
+import { usePhotoAnalysisFlow } from '@/hooks/use-photo-analysis-flow';
 import {
   useRecentLogs,
-  useQuickLog,
   useStats,
   useTrendSummary,
   type RecentLog,
 } from '@/hooks/use-poop-logs';
-import { buildRewardFeedback, type RewardFeedback } from '@/lib/catalog';
+import { useQuickLogFlow } from '@/hooks/use-quick-log-flow';
 import {
   logStatusLabel,
 } from '@/lib/log-utils';
-import { cancelFollowUp, scheduleAbnormalFollowUp } from '@/lib/notifications';
-import { uploadPoopPhoto } from '@/lib/uploads';
-import { supabase } from '@/lib/supabase';
+import { cancelFollowUp } from '@/lib/notifications';
 import { useSession } from '@/providers/session-provider';
-import type { Database } from '@/types/database';
-
-type ManualStatus = Database['public']['Tables']['poop_logs']['Row']['manual_status'];
 
 // ─── DEV ONLY: 通知測試面板 ───────────────────────────────────────────────────
 
@@ -118,234 +112,37 @@ export default function HomeScreen() {
   const { data: recentLogs = [], isLoading, isRefetching, refetch: refetchLogs } = useRecentLogs();
   const { data: statsData } = useStats();
   const { data: trendSummary } = useTrendSummary();
-  const assignPetMutation = useAssignPet();
-  const quickLogMutation = useQuickLog();
-
-  // ── 通知點擊追蹤：讀取 trackLogId param，從快取找 log，開 modal ──────────
-  // follow-up 通知對應昨天的 log，幾乎必然在 recentLogs 快取裡，不需要額外 fetch
-  const { trackLogId } = useLocalSearchParams<{ trackLogId?: string }>();
-  const handledTrackLogIdRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (!trackLogId || trackLogId === handledTrackLogIdRef.current) return;
-
-    const log = recentLogs.find((l) => l.id === trackLogId);
-    if (!log) return; // 不在快取裡（edge case），略過
-
-    handledTrackLogIdRef.current = trackLogId;
-    setDetailLog(log);
-    setIsFollowUp(true);
-  }, [trackLogId, recentLogs]);
-
-  // ── photo analysis state ──────────────────────────────────────────────────
-  const [currentLogId, setCurrentLogId] = useState<string | null>(null);
-  const [petAssigned, setPetAssigned] = useState(false);
-
-  const [isUploading, setIsUploading] = useState(false);
-  const [capturedAsset, setCapturedAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
-  const [modalPhase, setModalPhase] = useState<'analyzing' | 'result'>('analyzing');
-  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
-  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [detailLog, setDetailLog] = useState<DetailLog | null>(null);
-  const [isFollowUp, setIsFollowUp] = useState(false);
-
-  // 元件 unmount 時清除 polling，避免 memory leak
-  useEffect(() => {
-    return () => {
-      if (pollingRef.current) clearInterval(pollingRef.current);
-    };
-  }, []);
-
-  // ── quick log state ───────────────────────────────────────────────────────
-  const [quickLogVisible, setQuickLogVisible] = useState(false);
-  const [selectedStatus, setSelectedStatus] = useState<NonNullable<ManualStatus> | null>(null);
-  const [quickNote, setQuickNote] = useState('');
-  const [quickLogDone, setQuickLogDone] = useState(false);
-  const [rewardFeedback, setRewardFeedback] = useState<RewardFeedback | null>(null);
-
-  function openQuickLog() {
-    setSelectedStatus(null);
-    setQuickNote('');
-    setQuickLogDone(false);
-    setRewardFeedback(null);
-    setQuickLogVisible(true);
-  }
-
-  function closeQuickLog() {
-    setQuickLogVisible(false);
-    setRewardFeedback(null);
-  }
-
-  async function submitQuickLog() {
-    if (!selectedStatus) return;
-    const feedback = buildRewardFeedback(statsData?.rows ?? [], {
-      captured_at: new Date().toISOString(),
-      entry_mode: 'quick_log',
-      manual_status: selectedStatus,
-      risk_level: null,
-    });
-
-    try {
-      await quickLogMutation.mutateAsync({ manualStatus: selectedStatus, note: quickNote.trim() || undefined });
-      setRewardFeedback(feedback);
-      setQuickLogDone(true);
-    } catch {
-      Alert.alert('記錄失敗', '請稍後再試。');
-    }
-  }
-
-  // ── photo analysis ────────────────────────────────────────────────────────
-
-  async function uploadAsset(asset: ImagePicker.ImagePickerAsset) {
-    if (!supabase || !user) return;
-    setCapturedAsset(asset);
-    setModalPhase('analyzing');
-    setIsUploading(true);
-    setRewardFeedback(null);
-    try {
-      const imagePath = await uploadPoopPhoto(user.id, asset);
-      const { data: newLog, error } = await supabase
-        .from('poop_logs')
-        .insert({ image_path: imagePath, entry_mode: 'photo_ai', status: 'uploaded' })
-        .select('id, image_path')
-        .single();
-      if (error) throw error;
-      setCurrentLogId(newLog.id);
-      startPolling(newLog.id, newLog.image_path!);
-    } catch (err) {
-      Alert.alert('上傳失敗', err instanceof Error ? err.message : '請稍後再試。');
-      closePhotoModal();
-    } finally {
-      setIsUploading(false);
-    }
-  }
-
-  async function assignPet(petId: string) {
-    if (!currentLogId) return;
-    await assignPetMutation.mutateAsync({ logId: currentLogId, petId });
-    void refetchLogs();
-    setPetAssigned(true);
-  }
-
-  async function startScan() {
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert('需要相機權限', '請先允許 App 使用相機。');
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ['images'],
-      quality: 0.85,
-      allowsEditing: true,
-      aspect: [4, 3],
-    });
-    if (result.canceled || !result.assets[0]) return;
-    void uploadAsset(result.assets[0]);
-  }
-
-  async function pickFromLibrary() {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert('需要相簿權限', '請先允許 App 存取相簿。');
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 0.85,
-      allowsEditing: true,
-      aspect: [4, 3],
-    });
-    if (result.canceled || !result.assets[0]) return;
-    void uploadAsset(result.assets[0]);
-  }
-
-  function startPolling(logId: string, imagePath: string) {
-    if (pollingRef.current) clearInterval(pollingRef.current);
-
-    pollingRef.current = setInterval(async () => {
-      if (!supabase) return;
-
-      const { data } = await supabase
-        .from('poop_logs')
-        .select('status, bristol_score, risk_level, summary, recommendation')
-        .eq('id', logId)
-        .single();
-
-      if (data?.status === 'done' || data?.status === 'failed') {
-        clearInterval(pollingRef.current!);
-        pollingRef.current = null;
-
-        const { data: signedData } = await supabase.storage
-          .from('poop-photos')
-          .createSignedUrl(imagePath, 60 * 60);
-
-        const resolvedRiskLevel = data.status === 'failed' ? null : data.risk_level;
-        if (data.status !== 'failed') {
-          setRewardFeedback(
-            buildRewardFeedback(statsData?.rows ?? [], {
-              captured_at: new Date().toISOString(),
-              entry_mode: 'photo_ai',
-              manual_status: null,
-              risk_level: resolvedRiskLevel,
-            })
-          );
-        }
-
-        setAnalysisResult({
-          imageUrl: signedData?.signedUrl ?? '',
-          bristolScore: data.bristol_score,
-          riskLevel: resolvedRiskLevel,
-          summary: data.status === 'failed' ? '分析失敗，請重新拍照。' : data.summary,
-          recommendation: data.status === 'failed' ? null : data.recommendation,
-          failed: data.status === 'failed',
-        });
-
-        // 異常排程次日追蹤提醒
-        if (resolvedRiskLevel === 'vet' || resolvedRiskLevel === 'observe') {
-          void scheduleAbnormalFollowUp(logId);
-        }
-
-        setModalPhase('result');
-        void refetchLogs();
-      }
-    }, 2000);
-  }
-
-  function closePhotoModal() {
-    if (pollingRef.current) clearInterval(pollingRef.current);
-    pollingRef.current = null;
-    setCapturedAsset(null);
-    setModalPhase('analyzing');
-    setAnalysisResult(null);
-    setCurrentLogId(null);
-    setPetAssigned(false);
-    setRewardFeedback(null);
-  }
+  const logDetailFlow = useLogDetailFlow();
+  const quickLogFlow = useQuickLogFlow({ statsRows: statsData?.rows });
+  const photoAnalysisFlow = usePhotoAnalysisFlow({
+    onLogsUpdated: refetchLogs,
+    statsRows: statsData?.rows,
+  });
 
   return (
     <>
     <PhotoAnalysisModal
-      capturedAsset={capturedAsset}
-      modalPhase={modalPhase}
-      analysisResult={analysisResult}
-      petAssigned={petAssigned}
+      capturedAsset={photoAnalysisFlow.capturedAsset}
+      modalPhase={photoAnalysisFlow.modalPhase}
+      analysisResult={photoAnalysisFlow.analysisResult}
+      petAssigned={photoAnalysisFlow.petAssigned}
       pets={pets}
-      rewardFeedback={rewardFeedback}
-      onAssignPet={(petId) => void assignPet(petId)}
-      onClose={closePhotoModal}
+      rewardFeedback={photoAnalysisFlow.rewardFeedback}
+      onAssignPet={(petId) => void photoAnalysisFlow.assignPet(petId)}
+      onClose={photoAnalysisFlow.closePhotoModal}
     />
 
     <QuickLogModal
-      visible={quickLogVisible}
-      selectedStatus={selectedStatus}
-      quickNote={quickNote}
-      quickLogDone={quickLogDone}
-      rewardFeedback={rewardFeedback}
-      isPending={quickLogMutation.isPending}
-      onSelectStatus={setSelectedStatus}
-      onChangeNote={setQuickNote}
-      onSubmit={() => void submitQuickLog()}
-      onClose={closeQuickLog}
+      visible={quickLogFlow.isVisible}
+      selectedStatus={quickLogFlow.selectedStatus}
+      quickNote={quickLogFlow.quickNote}
+      quickLogDone={quickLogFlow.quickLogDone}
+      rewardFeedback={quickLogFlow.rewardFeedback}
+      isPending={quickLogFlow.isPending}
+      onSelectStatus={quickLogFlow.setSelectedStatus}
+      onChangeNote={quickLogFlow.setQuickNote}
+      onSubmit={() => void quickLogFlow.submitQuickLog()}
+      onClose={quickLogFlow.closeQuickLog}
     />
 
     <LinearGradient
@@ -358,6 +155,7 @@ export default function HomeScreen() {
           <View style={styles.contentArea}>
             <ScrollView
               style={styles.scroll}
+              contentInsetAdjustmentBehavior="automatic"
               contentContainerStyle={styles.scrollContent}
               showsVerticalScrollIndicator={false}
               refreshControl={
@@ -372,7 +170,7 @@ export default function HomeScreen() {
               <View style={styles.ctaRow}>
                 <Pressable
                   style={({ pressed }) => [styles.ctaCard, styles.ctaCardPrimary, pressed && styles.ctaCardPressed]}
-                  onPress={openQuickLog}
+                  onPress={quickLogFlow.openQuickLog}
                   disabled={!user}>
                   <View style={styles.ctaIconWrap}>
                     <Ionicons name="flash" size={28} color="#ffffff" />
@@ -383,8 +181,8 @@ export default function HomeScreen() {
 
                 <Pressable
                   style={({ pressed }) => [styles.ctaCard, styles.ctaCardSecondary, pressed && styles.ctaCardPressed]}
-                  onPress={() => void startScan()}
-                  disabled={isUploading || !user}>
+                  onPress={() => void photoAnalysisFlow.startScan()}
+                  disabled={photoAnalysisFlow.isUploading || !user}>
                   <View style={[styles.ctaIconWrap, { backgroundColor: 'rgba(32,178,170,0.12)' }]}>
                     <Ionicons name="camera" size={28} color="#20B2AA" />
                   </View>
@@ -395,8 +193,8 @@ export default function HomeScreen() {
 
               <Pressable
                 style={styles.libraryButton}
-                onPress={() => void pickFromLibrary()}
-                disabled={isUploading || !user}>
+                onPress={() => void photoAnalysisFlow.pickFromLibrary()}
+                disabled={photoAnalysisFlow.isUploading || !user}>
                 <Ionicons name="images-outline" size={16} color="#6c7a78" />
                 <Text style={styles.libraryButtonText}>從相簿選擇</Text>
               </Pressable>
@@ -427,12 +225,12 @@ export default function HomeScreen() {
                   <View style={styles.summaryActionRow}>
                     <Pressable
                       style={[styles.summaryActionButton, styles.summaryActionPrimary]}
-                      onPress={() => router.navigate('/(tabs)/history' as never)}>
+                      onPress={() => router.navigate('/history' as never)}>
                       <Text style={styles.summaryActionPrimaryText}>看歷程</Text>
                     </Pressable>
                     <Pressable
                       style={[styles.summaryActionButton, styles.summaryActionSecondary]}
-                      onPress={() => router.navigate('/(tabs)/catalog' as never)}>
+                      onPress={() => router.navigate('/catalog' as never)}>
                       <Text style={styles.summaryActionSecondaryText}>看圖鑑</Text>
                     </Pressable>
                   </View>
@@ -449,7 +247,7 @@ export default function HomeScreen() {
               {__DEV__ && recentLogs.length > 0 && (
                 <DebugPanel
                   recentLogs={recentLogs}
-                  onOpenFollowUp={(log) => { setDetailLog(log); setIsFollowUp(true); }}
+                  onOpenFollowUp={(log) => logDetailFlow.openLogDetail(log, { isFollowUp: true })}
                 />
               )}
             </ScrollView>
@@ -459,9 +257,9 @@ export default function HomeScreen() {
     </LinearGradient>
 
     <LogDetailModal
-      log={detailLog}
-      isFollowUp={isFollowUp}
-      onClose={() => { setDetailLog(null); setIsFollowUp(false); }}
+      log={logDetailFlow.detailLog}
+      isFollowUp={logDetailFlow.isFollowUp}
+      onClose={logDetailFlow.closeLogDetail}
     />
     </>
   );

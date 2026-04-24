@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -47,6 +47,23 @@ export default function PetEditorScreen() {
 
   const isSaving = createPet.isPending || updatePet.isPending;
   const isDeleting = deletePet.isPending;
+
+  useEffect(() => {
+    if (isNew) {
+      setName('');
+      setBreed('');
+      setWeightKg('');
+      setSpecies('dog');
+      return;
+    }
+
+    if (pet) {
+      setName(pet.name);
+      setBreed(pet.breed ?? '');
+      setWeightKg(pet.weight_kg ? String(pet.weight_kg) : '');
+      setSpecies(pet.species);
+    }
+  }, [isNew, pet]);
 
   async function handleSave() {
     if (!name.trim()) return;
@@ -95,6 +112,22 @@ export default function PetEditorScreen() {
       <SafeAreaView style={shared.screen} edges={['bottom']}>
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#20B2AA" />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!isNew && !isLoading && !pet) {
+    return (
+      <SafeAreaView style={shared.screen} edges={['bottom']}>
+        <Stack.Screen options={{ title: '編輯寵物' }} />
+        <View style={styles.centered}>
+          <Ionicons name="alert-circle-outline" size={40} color="#fca5a5" />
+          <Text style={styles.errorTitle}>找不到這隻寵物</Text>
+          <Text style={styles.errorSubtitle}>可能已被刪除，請返回寵物列表重新確認。</Text>
+          <Pressable style={styles.secondaryButton} onPress={() => router.replace('/settings/pets' as never)}>
+            <Text style={styles.secondaryButtonText}>回到寵物列表</Text>
+          </Pressable>
         </View>
       </SafeAreaView>
     );
@@ -192,6 +225,14 @@ export default function PetEditorScreen() {
 
 const styles = StyleSheet.create({
   centered: { alignItems: 'center', flex: 1, justifyContent: 'center' },
+  errorTitle: { color: '#171d1c', fontSize: 17, fontWeight: '700', marginTop: 4 },
+  errorSubtitle: {
+    color: '#6c7a78',
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 4,
+    textAlign: 'center',
+  },
   field: { gap: 8, paddingHorizontal: 16, paddingVertical: 14 },
   fieldLabel: { color: '#3c4948', fontSize: 14, fontWeight: '600' },
   speciesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
@@ -235,4 +276,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   deleteButtonText: { color: '#9a3412', fontSize: 16, fontWeight: '600' },
+  secondaryButton: {
+    alignItems: 'center',
+    backgroundColor: '#e9efed',
+    borderRadius: 14,
+    justifyContent: 'center',
+    marginTop: 18,
+    minHeight: 48,
+    paddingHorizontal: 18,
+  },
+  secondaryButtonText: { color: '#3c4948', fontSize: 15, fontWeight: '700' },
 });
