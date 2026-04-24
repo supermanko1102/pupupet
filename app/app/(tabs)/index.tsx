@@ -1,7 +1,8 @@
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import * as Notifications from 'expo-notifications';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -26,7 +27,7 @@ import { StatusPill } from '@/components/status-pill';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { usePets, useAssignPet } from '@/hooks/use-pets';
-import { useRecentLogs, useQuickLog } from '@/hooks/use-poop-logs';
+import { useRecentLogs, useQuickLog, type RecentLog } from '@/hooks/use-poop-logs';
 import {
   logStatusLabel,
   logStatusTone,
@@ -34,7 +35,7 @@ import {
   manualStatusEmoji,
   manualStatusLabel,
 } from '@/lib/log-utils';
-import { scheduleAbnormalFollowUp } from '@/lib/notifications';
+import { cancelFollowUp, scheduleAbnormalFollowUp } from '@/lib/notifications';
 import { uploadPoopPhoto } from '@/lib/uploads';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/providers/session-provider';
@@ -42,6 +43,78 @@ import type { Database } from '@/types/database';
 
 type ManualStatus = Database['public']['Tables']['poop_logs']['Row']['manual_status'];
 
+// ─── DEV ONLY: 通知測試面板 ───────────────────────────────────────────────────
+
+function DebugPanel({
+  recentLogs,
+  onOpenFollowUp,
+}: {
+  recentLogs: RecentLog[];
+  onOpenFollowUp: (log: DetailLog) => void;
+}) {
+  const firstAbnormal = recentLogs.find(
+    (l) => l.riskLevel === 'vet' || l.riskLevel === 'observe'
+  ) ?? recentLogs[0];
+
+  async function scheduleIn5Seconds() {
+    await cancelFollowUp(firstAbnormal.id);
+    await Notifications.scheduleNotificationAsync({
+      identifier: `follow_up_${firstAbnormal.id}`,
+      content: {
+        title: '記得追蹤昨天的異常',
+        body: '（測試）昨天有記錄到異常狀況，今天排便後記得再記錄一次。',
+        data: { logId: firstAbnormal.id, type: 'abnormal_follow_up' },
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: 5,
+        repeats: false,
+      },
+    });
+    Alert.alert('✅ 通知已排程', '5 秒後點擊測試 tap → navigate 流程');
+  }
+
+  return (
+    <View style={debugStyles.panel}>
+      <Text style={debugStyles.title}>🛠 DEV: 通知測試</Text>
+      <Text style={debugStyles.target} numberOfLines={1}>
+        目標 log：{firstAbnormal.id.slice(0, 8)}… ({firstAbnormal.riskLevel ?? firstAbnormal.manualStatus})
+      </Text>
+      <Pressable style={debugStyles.btn} onPress={() => onOpenFollowUp(firstAbnormal)}>
+        <Text style={debugStyles.btnText}>直接開 Follow-up Modal</Text>
+      </Pressable>
+      <Pressable style={[debugStyles.btn, debugStyles.btnSecondary]} onPress={() => void scheduleIn5Seconds()}>
+        <Text style={[debugStyles.btnText, { color: '#3c4948' }]}>排一個 5 秒後的通知</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+const debugStyles = StyleSheet.create({
+  panel: {
+    backgroundColor: '#fef9c3',
+    borderColor: '#fde047',
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 8,
+    marginHorizontal: 20,
+    marginTop: 24,
+    padding: 16,
+    width: '100%',
+  },
+  title: { color: '#713f12', fontSize: 13, fontWeight: '700' },
+  target: { color: '#92400e', fontSize: 12 },
+  btn: {
+    alignItems: 'center',
+    backgroundColor: '#20B2AA',
+    borderRadius: 10,
+    paddingVertical: 10,
+  },
+  btnSecondary: { backgroundColor: '#e9efed' },
+  btnText: { color: '#ffffff', fontSize: 14, fontWeight: '600' },
+});
+
+// ─── Home Screen ──────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
   const colorScheme = useColorScheme() ?? 'light';
@@ -52,6 +125,22 @@ export default function HomeScreen() {
   const { data: recentLogs = [], isLoading, isRefetching, refetch: refetchLogs } = useRecentLogs();
   const assignPetMutation = useAssignPet();
   const quickLogMutation = useQuickLog();
+
+  // ── 通知點擊追蹤：讀取 trackLogId param，從快取找 log，開 modal ──────────
+  // follow-up 通知對應昨天的 log，幾乎必然在 recentLogs 快取裡，不需要額外 fetch
+  const { trackLogId } = useLocalSearchParams<{ trackLogId?: string }>();
+  const handledTrackLogIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!trackLogId || trackLogId === handledTrackLogIdRef.current) return;
+
+    const log = recentLogs.find((l) => l.id === trackLogId);
+    if (!log) return; // 不在快取裡（edge case），略過
+
+    handledTrackLogIdRef.current = trackLogId;
+    setDetailLog(log);
+    setIsFollowUp(true);
+  }, [trackLogId, recentLogs]);
 
   // ── photo analysis state ──────────────────────────────────────────────────
   const [currentLogId, setCurrentLogId] = useState<string | null>(null);
@@ -78,6 +167,7 @@ export default function HomeScreen() {
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [detailLog, setDetailLog] = useState<DetailLog | null>(null);
+  const [isFollowUp, setIsFollowUp] = useState(false);
 
   // 元件 unmount 時清除 polling，避免 memory leak
   useEffect(() => {
@@ -379,6 +469,14 @@ export default function HomeScreen() {
                   <Text style={styles.emptyText}>還沒有紀錄，按上方按鈕開始第一筆。</Text>
                 </View>
               )}
+
+              {/* ── DEV ONLY: 通知測試面板 ─────────────────────────────────── */}
+              {__DEV__ && recentLogs.length > 0 && (
+                <DebugPanel
+                  recentLogs={recentLogs}
+                  onOpenFollowUp={(log) => { setDetailLog(log); setIsFollowUp(true); }}
+                />
+              )}
             </ScrollView>
 
             {menuOpen && (
@@ -392,7 +490,11 @@ export default function HomeScreen() {
       </SafeAreaView>
     </LinearGradient>
 
-    <LogDetailModal log={detailLog} onClose={() => setDetailLog(null)} />
+    <LogDetailModal
+      log={detailLog}
+      isFollowUp={isFollowUp}
+      onClose={() => { setDetailLog(null); setIsFollowUp(false); }}
+    />
     </>
   );
 }

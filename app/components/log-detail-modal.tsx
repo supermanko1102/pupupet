@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { modalStyles as ms } from '@/components/modal-styles';
 import { manualStatusBg, manualStatusEmoji, manualStatusLabel, riskBannerStyle, riskIcon, riskTitle } from '@/lib/log-utils';
+import { cancelFollowUp, scheduleAbnormalFollowUp } from '@/lib/notifications';
 import type { Database } from '@/types/database';
 
 type RiskLevel = Database['public']['Tables']['poop_logs']['Row']['risk_level'];
@@ -31,10 +32,11 @@ export type DetailLog = {
 
 type Props = {
   log: DetailLog | null;
+  isFollowUp?: boolean;
   onClose: () => void;
 };
 
-export function LogDetailModal({ log, onClose }: Props) {
+export function LogDetailModal({ log, isFollowUp = false, onClose }: Props) {
   return (
     <Modal visible={!!log} animationType="slide" presentationStyle="pageSheet">
       <SafeAreaView style={ms.modalSafe}>
@@ -87,11 +89,27 @@ export function LogDetailModal({ log, onClose }: Props) {
               </View>
             </View>
 
-            <View style={ms.modalActions}>
-              <Pressable style={[ms.modalButton, ms.primaryButton]} onPress={onClose}>
-                <Text style={ms.primaryButtonText}>關閉</Text>
-              </Pressable>
-            </View>
+            {isFollowUp && log.riskLevel !== 'normal' ? (
+              <View style={ms.modalActions}>
+                <Text style={styles.followUpLabel}>今天恢復正常了嗎？</Text>
+                <Pressable
+                  style={[ms.modalButton, ms.primaryButton]}
+                  onPress={() => { void cancelFollowUp(log.id); onClose(); }}>
+                  <Text style={ms.primaryButtonText}>已恢復正常</Text>
+                </Pressable>
+                <Pressable
+                  style={[ms.modalButton, ms.ghostButton]}
+                  onPress={() => { void scheduleAbnormalFollowUp(log.id); onClose(); }}>
+                  <Text style={ms.ghostButtonText}>仍在觀察中，明天再提醒</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <View style={ms.modalActions}>
+                <Pressable style={[ms.modalButton, ms.primaryButton]} onPress={onClose}>
+                  <Text style={ms.primaryButtonText}>關閉</Text>
+                </Pressable>
+              </View>
+            )}
           </ScrollView>
         )}
       </SafeAreaView>
@@ -110,4 +128,12 @@ const styles = StyleSheet.create({
   },
   infoLabel: { color: '#6c7a78', fontSize: 15 },
   infoValue: { color: '#171d1c', fontSize: 15, fontWeight: '700' },
+
+  followUpLabel: {
+    color: '#3c4948',
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
 });
