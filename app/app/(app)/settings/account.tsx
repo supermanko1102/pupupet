@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,10 +10,23 @@ import { useSession } from '@/providers/session-provider';
 export default function SettingsAccountScreen() {
   const { user } = useSession();
 
+  async function signOut() {
+    if (!supabase) return;
+
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      Alert.alert('登出失敗', error.message);
+      return;
+    }
+
+    router.dismissAll();
+    router.replace('/sign-in' as never);
+  }
+
   function handleSignOut() {
     Alert.alert('登出', '確定要登出嗎？', [
       { text: '取消', style: 'cancel' },
-      { text: '登出', style: 'destructive', onPress: () => void supabase?.auth.signOut() },
+      { text: '登出', style: 'destructive', onPress: () => void signOut() },
     ]);
   }
 
