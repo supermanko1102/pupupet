@@ -1,13 +1,10 @@
-import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Notifications from 'expo-notifications';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
-  Animated,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -21,19 +18,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { LogDetailModal, type DetailLog } from '@/components/log-detail-modal';
 import { PhotoAnalysisModal, type AnalysisResult } from '@/components/photo-analysis-modal';
 import { QuickLogModal } from '@/components/quick-log-modal';
-import { SettingsPanel } from '@/components/settings';
-import { StatusPill } from '@/components/status-pill';
-
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { usePets, useAssignPet } from '@/hooks/use-pets';
-import { useRecentLogs, useQuickLog, type RecentLog } from '@/hooks/use-poop-logs';
+import {
+  useRecentLogs,
+  useQuickLog,
+  useStats,
+  useTrendSummary,
+  type RecentLog,
+} from '@/hooks/use-poop-logs';
+import { buildRewardFeedback, type RewardFeedback } from '@/lib/catalog';
 import {
   logStatusLabel,
-  logStatusTone,
-  manualStatusBg,
-  manualStatusEmoji,
-  manualStatusLabel,
 } from '@/lib/log-utils';
 import { cancelFollowUp, scheduleAbnormalFollowUp } from '@/lib/notifications';
 import { uploadPoopPhoto } from '@/lib/uploads';
@@ -117,12 +112,12 @@ const debugStyles = StyleSheet.create({
 // ─── Home Screen ──────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
-  const colorScheme = useColorScheme() ?? 'light';
   const { user } = useSession();
-  const palette = Colors[colorScheme];
 
   const { data: pets = [] } = usePets();
   const { data: recentLogs = [], isLoading, isRefetching, refetch: refetchLogs } = useRecentLogs();
+  const { data: statsData } = useStats();
+  const { data: trendSummary } = useTrendSummary();
   const assignPetMutation = useAssignPet();
   const quickLogMutation = useQuickLog();
 
@@ -145,21 +140,6 @@ export default function HomeScreen() {
   // ── photo analysis state ──────────────────────────────────────────────────
   const [currentLogId, setCurrentLogId] = useState<string | null>(null);
   const [petAssigned, setPetAssigned] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const iconAnim = useRef(new Animated.Value(0)).current;
-
-  const menuOpacity = iconAnim.interpolate({ inputRange: [0, 0.4, 1], outputRange: [1, 0, 0] });
-  const closeOpacity = iconAnim.interpolate({ inputRange: [0, 0.6, 1], outputRange: [0, 0, 1] });
-  const closeRotate = iconAnim.interpolate({ inputRange: [0, 1], outputRange: ['-90deg', '0deg'] });
-
-  function openMenu() {
-    setMenuOpen(true);
-    Animated.timing(iconAnim, { toValue: 1, duration: 220, useNativeDriver: true }).start();
-  }
-
-  function closeMenu() {
-    Animated.timing(iconAnim, { toValue: 0, duration: 180, useNativeDriver: true }).start(() => setMenuOpen(false));
-  }
 
   const [isUploading, setIsUploading] = useState(false);
   const [capturedAsset, setCapturedAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
@@ -181,18 +161,33 @@ export default function HomeScreen() {
   const [selectedStatus, setSelectedStatus] = useState<NonNullable<ManualStatus> | null>(null);
   const [quickNote, setQuickNote] = useState('');
   const [quickLogDone, setQuickLogDone] = useState(false);
+  const [rewardFeedback, setRewardFeedback] = useState<RewardFeedback | null>(null);
 
   function openQuickLog() {
     setSelectedStatus(null);
     setQuickNote('');
     setQuickLogDone(false);
+    setRewardFeedback(null);
     setQuickLogVisible(true);
+  }
+
+  function closeQuickLog() {
+    setQuickLogVisible(false);
+    setRewardFeedback(null);
   }
 
   async function submitQuickLog() {
     if (!selectedStatus) return;
+    const feedback = buildRewardFeedback(statsData?.rows ?? [], {
+      captured_at: new Date().toISOString(),
+      entry_mode: 'quick_log',
+      manual_status: selectedStatus,
+      risk_level: null,
+    });
+
     try {
       await quickLogMutation.mutateAsync({ manualStatus: selectedStatus, note: quickNote.trim() || undefined });
+      setRewardFeedback(feedback);
       setQuickLogDone(true);
     } catch {
       Alert.alert('記錄失敗', '請稍後再試。');
@@ -206,6 +201,7 @@ export default function HomeScreen() {
     setCapturedAsset(asset);
     setModalPhase('analyzing');
     setIsUploading(true);
+    setRewardFeedback(null);
     try {
       const imagePath = await uploadPoopPhoto(user.id, asset);
       const { data: newLog, error } = await supabase
@@ -284,6 +280,17 @@ export default function HomeScreen() {
           .createSignedUrl(imagePath, 60 * 60);
 
         const resolvedRiskLevel = data.status === 'failed' ? null : data.risk_level;
+        if (data.status !== 'failed') {
+          setRewardFeedback(
+            buildRewardFeedback(statsData?.rows ?? [], {
+              captured_at: new Date().toISOString(),
+              entry_mode: 'photo_ai',
+              manual_status: null,
+              risk_level: resolvedRiskLevel,
+            })
+          );
+        }
+
         setAnalysisResult({
           imageUrl: signedData?.signedUrl ?? '',
           bristolScore: data.bristol_score,
@@ -312,6 +319,7 @@ export default function HomeScreen() {
     setAnalysisResult(null);
     setCurrentLogId(null);
     setPetAssigned(false);
+    setRewardFeedback(null);
   }
 
   return (
@@ -322,6 +330,7 @@ export default function HomeScreen() {
       analysisResult={analysisResult}
       petAssigned={petAssigned}
       pets={pets}
+      rewardFeedback={rewardFeedback}
       onAssignPet={(petId) => void assignPet(petId)}
       onClose={closePhotoModal}
     />
@@ -331,11 +340,12 @@ export default function HomeScreen() {
       selectedStatus={selectedStatus}
       quickNote={quickNote}
       quickLogDone={quickLogDone}
+      rewardFeedback={rewardFeedback}
       isPending={quickLogMutation.isPending}
       onSelectStatus={setSelectedStatus}
       onChangeNote={setQuickNote}
       onSubmit={() => void submitQuickLog()}
-      onClose={() => setQuickLogVisible(false)}
+      onClose={closeQuickLog}
     />
 
     <LinearGradient
@@ -343,26 +353,7 @@ export default function HomeScreen() {
       start={{ x: 0, y: 0 }}
       end={{ x: 0, y: 0.4 }}
       style={styles.screen}>
-      <SafeAreaView style={styles.safeArea}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Pressable style={styles.hamburgerButton} onPress={menuOpen ? closeMenu : openMenu}>
-            <View style={styles.iconWrap}>
-              <Animated.View style={[StyleSheet.absoluteFill, { opacity: menuOpacity }]}>
-                <Ionicons name="menu" size={26} color="#006a65" />
-              </Animated.View>
-              <Animated.View style={[StyleSheet.absoluteFill, { opacity: closeOpacity, transform: [{ rotate: closeRotate }] }]}>
-                <Ionicons name="close" size={26} color="#006a65" />
-              </Animated.View>
-            </View>
-          </Pressable>
-          <Text style={styles.brandName}>PupuPet</Text>
-          <Pressable style={styles.notifButton}>
-            <Ionicons name="notifications-outline" size={24} color="#006a65" />
-          </Pressable>
-        </View>
-
-        {/* Content */}
+      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
         <View style={styles.bodyWrap}>
           <View style={styles.contentArea}>
             <ScrollView
@@ -373,15 +364,12 @@ export default function HomeScreen() {
                 <RefreshControl refreshing={isRefetching} onRefresh={() => void refetchLogs()} />
               }>
 
-              {/* Hero */}
               <View style={styles.heroSection}>
                 <Text style={styles.heroTitle}>今天記一下</Text>
                 <Text style={styles.heroSubtitle}>每次排便都只要 5 秒</Text>
               </View>
 
-              {/* 雙 CTA */}
               <View style={styles.ctaRow}>
-                {/* 快速記錄 */}
                 <Pressable
                   style={({ pressed }) => [styles.ctaCard, styles.ctaCardPrimary, pressed && styles.ctaCardPressed]}
                   onPress={openQuickLog}
@@ -393,7 +381,6 @@ export default function HomeScreen() {
                   <Text style={styles.ctaCardSub}>選狀態，5 秒完成</Text>
                 </Pressable>
 
-                {/* 拍照分析 */}
                 <Pressable
                   style={({ pressed }) => [styles.ctaCard, styles.ctaCardSecondary, pressed && styles.ctaCardPressed]}
                   onPress={() => void startScan()}
@@ -406,7 +393,6 @@ export default function HomeScreen() {
                 </Pressable>
               </View>
 
-              {/* 從相簿選擇 */}
               <Pressable
                 style={styles.libraryButton}
                 onPress={() => void pickFromLibrary()}
@@ -415,53 +401,43 @@ export default function HomeScreen() {
                 <Text style={styles.libraryButtonText}>從相簿選擇</Text>
               </Pressable>
 
-              {/* Recent Logs */}
-              {recentLogs.length > 0 && (
-                <View style={styles.logsSection}>
-                  <View style={styles.logsSectionHeader}>
-                    <Text style={styles.logsSectionTitle}>最近紀錄</Text>
-                    <View style={styles.logsSectionRight}>
-                      {isLoading && <ActivityIndicator size="small" color={palette.tint} />}
-                      <Pressable onPress={() => router.push('/history' as never)}>
-                        <Text style={styles.viewAllText}>查看全部</Text>
-                      </Pressable>
+              <View style={styles.summarySection}>
+                <Text style={styles.summarySectionTitle}>最近狀態</Text>
+                <View style={styles.summaryCard}>
+                  <View style={styles.summaryCardTop}>
+                    <View style={styles.summaryIconWrap}>
+                      <Ionicons
+                        name={trendSummary?.hasRecentAbnormal ? 'warning-outline' : 'checkmark-circle-outline'}
+                        size={22}
+                        color={trendSummary?.hasRecentAbnormal ? '#92400e' : '#065f46'}
+                      />
+                    </View>
+                    <View style={styles.summaryBody}>
+                      <Text style={styles.summaryTitle}>
+                        {trendSummary?.message ?? '還沒有記錄，先完成第一筆吧'}
+                      </Text>
+                      <Text style={styles.summarySubtitle}>
+                        {recentLogs[0]
+                          ? `${new Date(recentLogs[0].capturedAt).toLocaleString('zh-TW')} ・ ${logStatusLabel(recentLogs[0])}`
+                          : '記錄夠快，異常有後續，這裡只保留最重要的狀態。'}
+                      </Text>
                     </View>
                   </View>
-                  {recentLogs.map((log) => (
-                    <Pressable key={log.id} style={styles.logCard} onPress={() => setDetailLog(log)}>
-                      {log.entryMode === 'quick_log' ? (
-                        <View style={[styles.logImagePlaceholder, { backgroundColor: manualStatusBg(log.manualStatus) }]}>
-                          <Text style={styles.logImagePlaceholderEmoji}>{manualStatusEmoji(log.manualStatus)}</Text>
-                          <Text style={styles.logImagePlaceholderLabel}>{manualStatusLabel(log.manualStatus)}</Text>
-                        </View>
-                      ) : log.imageUrl ? (
-                        <Image source={{ uri: log.imageUrl }} style={styles.logImage} contentFit="cover" />
-                      ) : (
-                        <View style={[styles.logImage, styles.logImageFallback]}>
-                          <Ionicons name="image-outline" size={24} color="#bbc9c7" />
-                        </View>
-                      )}
-                      <View style={styles.logMeta}>
-                        <View style={styles.logRow}>
-                          <Text style={styles.logPetName}>{log.petName}</Text>
-                          <StatusPill
-                            label={logStatusLabel(log)}
-                            tone={logStatusTone(log)}
-                          />
-                        </View>
-                        <Text style={styles.logDate}>
-                          {new Date(log.capturedAt).toLocaleString('zh-TW')}
-                        </Text>
-                        {log.note ? (
-                          <Text style={styles.logSummary} numberOfLines={1}>{log.note}</Text>
-                        ) : log.summary ? (
-                          <Text style={styles.logSummary} numberOfLines={2}>{log.summary}</Text>
-                        ) : null}
-                      </View>
+
+                  <View style={styles.summaryActionRow}>
+                    <Pressable
+                      style={[styles.summaryActionButton, styles.summaryActionPrimary]}
+                      onPress={() => router.navigate('/(tabs)/history' as never)}>
+                      <Text style={styles.summaryActionPrimaryText}>看歷程</Text>
                     </Pressable>
-                  ))}
+                    <Pressable
+                      style={[styles.summaryActionButton, styles.summaryActionSecondary]}
+                      onPress={() => router.navigate('/(tabs)/catalog' as never)}>
+                      <Text style={styles.summaryActionSecondaryText}>看圖鑑</Text>
+                    </Pressable>
+                  </View>
                 </View>
-              )}
+              </View>
 
               {user && recentLogs.length === 0 && !isLoading && (
                 <View style={styles.emptyState}>
@@ -470,7 +446,6 @@ export default function HomeScreen() {
                 </View>
               )}
 
-              {/* ── DEV ONLY: 通知測試面板 ─────────────────────────────────── */}
               {__DEV__ && recentLogs.length > 0 && (
                 <DebugPanel
                   recentLogs={recentLogs}
@@ -478,15 +453,8 @@ export default function HomeScreen() {
                 />
               )}
             </ScrollView>
-
-            {menuOpen && (
-              <View style={[StyleSheet.absoluteFill, { backgroundColor: '#ffffff' }]}>
-                <SettingsPanel />
-              </View>
-            )}
           </View>
         </View>
-
       </SafeAreaView>
     </LinearGradient>
 
@@ -506,19 +474,8 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   safeArea: { flex: 1 },
-  header: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-  },
-  hamburgerButton: { alignItems: 'center', height: 40, justifyContent: 'center', width: 40 },
-  iconWrap: { height: 26, width: 26 },
   bodyWrap: { flex: 1 },
   contentArea: { flex: 1, overflow: 'hidden' },
-  brandName: { color: '#20B2AA', fontWeight: '800', fontSize: 20, letterSpacing: -0.5 },
-  notifButton: { alignItems: 'center', borderRadius: 999, height: 40, justifyContent: 'center', width: 40 },
   scroll: { flex: 1 },
   scrollContent: { alignItems: 'center', paddingBottom: 40, paddingTop: 16 },
 
@@ -572,43 +529,41 @@ const styles = StyleSheet.create({
   },
   libraryButtonText: { color: '#6c7a78', fontSize: 14, fontWeight: '500' },
 
-  // Recent logs
-  logsSection: { gap: 12, paddingHorizontal: 20, width: '100%' },
-  logsSectionHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  logsSectionTitle: { color: '#171d1c', fontSize: 17, fontWeight: '700' },
-  logsSectionRight: { alignItems: 'center', flexDirection: 'row', gap: 10 },
-  viewAllText: { color: '#20B2AA', fontSize: 14, fontWeight: '600' },
-  logCard: {
+  summarySection: { gap: 10, paddingHorizontal: 20, width: '100%' },
+  summarySectionTitle: { color: '#171d1c', fontSize: 17, fontWeight: '700' },
+  summaryCard: {
     backgroundColor: '#f5fbf9',
-    borderRadius: 20,
-    gap: 12,
-    overflow: 'hidden',
-    padding: 12,
-    borderWidth: 1,
     borderColor: '#e3e9e8',
+    borderRadius: 20,
+    borderWidth: 1,
+    gap: 14,
+    padding: 16,
   },
-  logImage: { borderRadius: 14, height: 140, width: '100%' },
-  logImageFallback: { alignItems: 'center', backgroundColor: '#e9efed', justifyContent: 'center' },
-  logImagePlaceholder: {
+  summaryCardTop: { flexDirection: 'row', gap: 12 },
+  summaryIconWrap: {
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 999,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+  },
+  summaryBody: { flex: 1, gap: 4 },
+  summaryTitle: { color: '#171d1c', fontSize: 16, fontWeight: '700', lineHeight: 22 },
+  summarySubtitle: { color: '#6c7a78', fontSize: 13, lineHeight: 19 },
+  summaryActionRow: { flexDirection: 'row', gap: 10 },
+  summaryActionButton: {
     alignItems: 'center',
     borderRadius: 14,
-    gap: 6,
-    height: 80,
+    flex: 1,
     justifyContent: 'center',
-    width: '100%',
+    minHeight: 46,
+    paddingHorizontal: 14,
   },
-  logImagePlaceholderEmoji: { fontSize: 28 },
-  logImagePlaceholderLabel: { color: '#3c4948', fontSize: 13, fontWeight: '600' },
-  logMeta: { gap: 4 },
-  logRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  logPetName: { color: '#171d1c', fontSize: 15, fontWeight: '600' },
-  logDate: { color: '#6c7a78', fontSize: 13 },
-  logSummary: { color: '#3c4948', fontSize: 14, lineHeight: 20, marginTop: 2 },
+  summaryActionPrimary: { backgroundColor: '#20B2AA' },
+  summaryActionSecondary: { backgroundColor: '#e9efed' },
+  summaryActionPrimaryText: { color: '#ffffff', fontSize: 15, fontWeight: '700' },
+  summaryActionSecondaryText: { color: '#3c4948', fontSize: 15, fontWeight: '700' },
   emptyState: { alignItems: 'center', gap: 12, marginTop: 24, paddingHorizontal: 40 },
   emptyText: { color: '#6c7a78', fontSize: 15, lineHeight: 22, textAlign: 'center' },
 

@@ -1,12 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { settingsRouteStyles as shared } from '@/components/settings/route-shared';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/providers/session-provider';
 
-import { SubHeader, shared } from './_shared';
-
-export function AccountView({ onBack }: { onBack: () => void }) {
+export default function SettingsAccountScreen() {
   const { user } = useSession();
 
   function handleSignOut() {
@@ -17,25 +17,27 @@ export function AccountView({ onBack }: { onBack: () => void }) {
   }
 
   return (
-    <>
-      <SubHeader title="帳號管理" onBack={onBack} />
+    <SafeAreaView style={shared.screen} edges={['bottom']}>
       <ScrollView style={shared.scroll} contentContainerStyle={shared.content} showsVerticalScrollIndicator={false}>
         <View style={shared.section}>
-          <View style={s.infoRow}>
-            <Text style={s.infoLabel}>電子郵件</Text>
-            <Text style={s.infoValue} numberOfLines={1}>{user?.email ?? '—'}</Text>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>電子郵件</Text>
+            <Text style={styles.infoValue} numberOfLines={1}>
+              {user?.email ?? '—'}
+            </Text>
           </View>
         </View>
-        <Pressable style={s.signOutButton} onPress={handleSignOut}>
+
+        <Pressable style={styles.signOutButton} onPress={handleSignOut}>
           <Ionicons name="log-out-outline" size={18} color="#9a3412" />
-          <Text style={s.signOutText}>登出</Text>
+          <Text style={styles.signOutText}>登出</Text>
         </Pressable>
       </ScrollView>
-    </>
+    </SafeAreaView>
   );
 }
 
-const s = StyleSheet.create({
+const styles = StyleSheet.create({
   infoRow: {
     alignItems: 'center',
     flexDirection: 'row',

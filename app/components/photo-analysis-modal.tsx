@@ -13,6 +13,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 import { modalStyles as ms } from '@/components/modal-styles';
+import { UnlockFeedbackCard } from '@/components/unlock-feedback-card';
+import type { RewardFeedback } from '@/lib/catalog';
 import { riskBannerStyle, riskIcon, riskTitle } from '@/lib/log-utils';
 import type { Database } from '@/types/database';
 
@@ -34,6 +36,7 @@ type Props = {
   analysisResult: AnalysisResult | null;
   petAssigned: boolean;
   pets: Pet[];
+  rewardFeedback?: RewardFeedback | null;
   onAssignPet: (petId: string) => void;
   onClose: () => void;
 };
@@ -44,6 +47,7 @@ export function PhotoAnalysisModal({
   analysisResult,
   petAssigned,
   pets,
+  rewardFeedback,
   onAssignPet,
   onClose,
 }: Props) {
@@ -98,6 +102,8 @@ export function PhotoAnalysisModal({
                   <Text style={ms.trackingNoticeText}>明天會提醒你追蹤狀況</Text>
                 </View>
               )}
+
+              {rewardFeedback ? <UnlockFeedbackCard feedback={rewardFeedback} /> : null}
 
               {!analysisResult.failed && (
                 <View style={styles.petPickerSection}>

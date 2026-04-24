@@ -91,63 +91,65 @@ export default function HistoryScreen() {
   return (
     <>
       <SafeAreaView style={styles.screen} edges={['bottom']}>
-        <SectionList
-          sections={sections}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <LogCard log={item} onPress={() => setDetailLog(item)} />
-          )}
-          renderSectionHeader={({ section }) => (
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionHeaderText}>{section.title}</Text>
-            </View>
-          )}
-          contentContainerStyle={logs.length === 0 ? styles.emptyContainer : styles.listContent}
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefetching && !isFetchingNextPage}
-              onRefresh={() => void refetch()}
-              tintColor="#20B2AA"
-            />
-          }
-          onEndReached={handleLoadMore}
-          onEndReachedThreshold={0.3}
-          stickySectionHeadersEnabled={false}
-          ListHeaderComponent={
-            trendSummary ? (
-              <View style={styles.trendCard}>
-                <View style={styles.trendRow}>
-                  <Ionicons
-                    name={trendSummary.hasRecentAbnormal ? 'warning-outline' : 'checkmark-circle-outline'}
-                    size={20}
-                    color={trendSummary.hasRecentAbnormal ? '#92400e' : '#065f46'}
-                  />
-                  <Text style={[
-                    styles.trendMessage,
-                    { color: trendSummary.hasRecentAbnormal ? '#92400e' : '#065f46' }
-                  ]}>
-                    {trendSummary.message}
-                  </Text>
+        <View style={styles.contentArea}>
+          <SectionList
+            sections={sections}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <LogCard log={item} onPress={() => setDetailLog(item)} />
+            )}
+            renderSectionHeader={({ section }) => (
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionHeaderText}>{section.title}</Text>
+              </View>
+            )}
+            contentContainerStyle={logs.length === 0 ? styles.emptyContainer : styles.listContent}
+            refreshControl={
+              <RefreshControl
+                refreshing={isRefetching && !isFetchingNextPage}
+                onRefresh={() => void refetch()}
+                tintColor="#20B2AA"
+              />
+            }
+            onEndReached={handleLoadMore}
+            onEndReachedThreshold={0.3}
+            stickySectionHeadersEnabled={false}
+            ListHeaderComponent={
+              trendSummary ? (
+                <View style={styles.trendCard}>
+                  <View style={styles.trendRow}>
+                    <Ionicons
+                      name={trendSummary.hasRecentAbnormal ? 'warning-outline' : 'checkmark-circle-outline'}
+                      size={20}
+                      color={trendSummary.hasRecentAbnormal ? '#92400e' : '#065f46'}
+                    />
+                    <Text style={[
+                      styles.trendMessage,
+                      { color: trendSummary.hasRecentAbnormal ? '#92400e' : '#065f46' }
+                    ]}>
+                      {trendSummary.message}
+                    </Text>
+                  </View>
+                  <Text style={styles.trendCount}>共 {trendSummary.recentCount} 筆紀錄</Text>
                 </View>
-                <Text style={styles.trendCount}>共 {trendSummary.recentCount} 筆紀錄</Text>
+              ) : null
+            }
+            ListEmptyComponent={
+              <View style={styles.emptyState}>
+                <Ionicons name="paw-outline" size={48} color="#bbc9c7" />
+                <Text style={styles.emptyTitle}>還沒有紀錄</Text>
+                <Text style={styles.emptySubtitle}>回首頁記錄第一筆，只需要 5 秒</Text>
               </View>
-            ) : null
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <Ionicons name="paw-outline" size={48} color="#bbc9c7" />
-              <Text style={styles.emptyTitle}>還沒有紀錄</Text>
-              <Text style={styles.emptySubtitle}>回首頁記錄第一筆，只需要 5 秒</Text>
-            </View>
-          }
-          ListFooterComponent={
-            isFetchingNextPage ? (
-              <View style={styles.footer}>
-                <ActivityIndicator size="small" color="#20B2AA" />
-              </View>
-            ) : null
-          }
-        />
+            }
+            ListFooterComponent={
+              isFetchingNextPage ? (
+                <View style={styles.footer}>
+                  <ActivityIndicator size="small" color="#20B2AA" />
+                </View>
+              ) : null
+            }
+          />
+        </View>
       </SafeAreaView>
 
       <Modal visible={!!detailLog} animationType="slide" presentationStyle="pageSheet">
@@ -247,8 +249,6 @@ export default function HistoryScreen() {
   );
 }
 
-// ─── LogCard ──────────────────────────────────────────────────────────────────
-
 function LogCard({ log, onPress }: { log: HistoryLog; onPress: () => void }) {
   return (
     <Pressable style={styles.card} onPress={onPress}>
@@ -281,8 +281,6 @@ function LogCard({ log, onPress }: { log: HistoryLog; onPress: () => void }) {
   );
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
 function buildSections(logs: HistoryLog[]): Section[] {
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -307,32 +305,27 @@ function buildSections(logs: HistoryLog[]): Section[] {
   return sections;
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
   screen: { backgroundColor: '#ffffff', flex: 1 },
+  contentArea: { flex: 1, overflow: 'hidden' },
   centered: { alignItems: 'center', flex: 1, gap: 12, justifyContent: 'center' },
   errorText: { color: '#6c7a78', fontSize: 15, textAlign: 'center' },
   listContent: { paddingBottom: 32, paddingTop: 8 },
   emptyContainer: { flex: 1 },
-
-  // Trend summary
   trendCard: {
     backgroundColor: '#f0fdf9',
     borderColor: '#6ee7b7',
     borderRadius: 16,
     borderWidth: 1,
     gap: 4,
+    marginBottom: 8,
     marginHorizontal: 20,
     marginTop: 16,
-    marginBottom: 8,
     padding: 16,
   },
   trendRow: { alignItems: 'center', flexDirection: 'row', gap: 8 },
   trendMessage: { flex: 1, fontSize: 15, fontWeight: '600' },
   trendCount: { color: '#6c7a78', fontSize: 13, marginLeft: 28 },
-
-  // Section
   sectionHeader: {
     backgroundColor: '#ffffff',
     paddingBottom: 8,
@@ -346,8 +339,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
-
-  // Card
   card: {
     backgroundColor: '#f5fbf9',
     borderColor: '#e3e9e8',
@@ -375,23 +366,26 @@ const styles = StyleSheet.create({
   cardPetName: { color: '#171d1c', fontSize: 15, fontWeight: '600' },
   cardDate: { color: '#6c7a78', fontSize: 12 },
   cardSummary: { color: '#3c4948', fontSize: 13, lineHeight: 18, marginTop: 2 },
-
-  // Empty
   emptyState: {
-    alignItems: 'center', flex: 1, gap: 12, justifyContent: 'center',
-    paddingHorizontal: 40, paddingTop: 80,
+    alignItems: 'center',
+    flex: 1,
+    gap: 12,
+    justifyContent: 'center',
+    paddingHorizontal: 40,
+    paddingTop: 80,
   },
   emptyTitle: { color: '#171d1c', fontSize: 17, fontWeight: '700' },
   emptySubtitle: { color: '#6c7a78', fontSize: 14, lineHeight: 20, textAlign: 'center' },
   footer: { alignItems: 'center', paddingVertical: 20 },
-
-  // Modal
   modalSafe: { backgroundColor: '#ffffff', flex: 1 },
   modalContent: { paddingBottom: 8 },
   modalImage: { height: 260, width: '100%' },
   modalImageFallback: { alignItems: 'center', backgroundColor: '#e9efed', justifyContent: 'center' },
   modalQuickBanner: {
-    alignItems: 'center', gap: 8, justifyContent: 'center', paddingVertical: 48,
+    alignItems: 'center',
+    gap: 8,
+    justifyContent: 'center',
+    paddingVertical: 48,
   },
   modalQuickEmoji: { fontSize: 56 },
   modalQuickLabel: { color: '#3c4948', fontSize: 22, fontWeight: '700' },
@@ -399,39 +393,62 @@ const styles = StyleSheet.create({
   modalBody: { gap: 12, padding: 20 },
   modalActions: { gap: 12, padding: 24 },
   riskBanner: {
-    alignItems: 'center', borderRadius: 16, borderWidth: 1,
-    flexDirection: 'row', gap: 14, padding: 16,
+    alignItems: 'center',
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 14,
+    padding: 16,
   },
   riskBannerIcon: { fontSize: 32 },
   riskBannerTitle: { fontSize: 18, fontWeight: '700' },
   riskBannerSub: { fontSize: 14, marginTop: 2, opacity: 0.8 },
   infoRow: {
-    alignItems: 'center', backgroundColor: '#f5fbf9', borderRadius: 12,
-    flexDirection: 'row', justifyContent: 'space-between', padding: 14,
+    alignItems: 'center',
+    backgroundColor: '#f5fbf9',
+    borderRadius: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 14,
   },
   infoLabel: { color: '#6c7a78', fontSize: 15 },
   infoValue: { color: '#171d1c', fontSize: 15, fontWeight: '700' },
   recommendBox: { backgroundColor: '#f5fbf9', borderRadius: 12, gap: 6, padding: 14 },
   recommendLabel: {
-    color: '#6c7a78', fontSize: 13, fontWeight: '600',
-    letterSpacing: 0.5, textTransform: 'uppercase',
+    color: '#6c7a78',
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
   recommendText: { color: '#3c4948', fontSize: 15, lineHeight: 22 },
   closeButton: {
-    alignItems: 'center', backgroundColor: '#20B2AA',
-    borderRadius: 16, height: 54, justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#20B2AA',
+    borderRadius: 16,
+    height: 54,
+    justifyContent: 'center',
   },
   closeButtonText: { color: '#ffffff', fontSize: 17, fontWeight: '700' },
   unclassifiedBox: { backgroundColor: '#f5fbf9', borderRadius: 12, gap: 10, padding: 14 },
   unclassifiedLabel: {
-    color: '#6c7a78', fontSize: 13, fontWeight: '600',
-    letterSpacing: 0.4, textTransform: 'uppercase',
+    color: '#6c7a78',
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
   },
   petPickerRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   petPickerButton: {
-    alignItems: 'center', backgroundColor: '#ffffff', borderColor: '#e3e9e8',
-    borderRadius: 10, borderWidth: 1, flexDirection: 'row',
-    gap: 6, paddingHorizontal: 12, paddingVertical: 8,
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderColor: '#e3e9e8',
+    borderRadius: 10,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   petPickerEmoji: { fontSize: 16 },
   petPickerName: { color: '#171d1c', fontSize: 14, fontWeight: '600' },

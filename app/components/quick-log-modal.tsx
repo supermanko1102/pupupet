@@ -11,6 +11,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 import { modalStyles as ms } from '@/components/modal-styles';
+import { UnlockFeedbackCard } from '@/components/unlock-feedback-card';
+import type { RewardFeedback } from '@/lib/catalog';
 import { toneBorderColor } from '@/lib/log-utils';
 import type { Database } from '@/types/database';
 
@@ -33,6 +35,7 @@ type Props = {
   selectedStatus: NonNullable<ManualStatus> | null;
   quickNote: string;
   quickLogDone: boolean;
+  rewardFeedback?: RewardFeedback | null;
   isPending: boolean;
   onSelectStatus: (status: NonNullable<ManualStatus>) => void;
   onChangeNote: (note: string) => void;
@@ -45,6 +48,7 @@ export function QuickLogModal({
   selectedStatus,
   quickNote,
   quickLogDone,
+  rewardFeedback,
   isPending,
   onSelectStatus,
   onChangeNote,
@@ -66,6 +70,7 @@ export function QuickLogModal({
                 <Text style={ms.trackingNoticeText}>明天會提醒你追蹤狀況</Text>
               </View>
             )}
+            {rewardFeedback ? <UnlockFeedbackCard feedback={rewardFeedback} /> : null}
             <Pressable
               style={[ms.modalButton, ms.primaryButton, { marginTop: 24, width: '80%' }]}
               onPress={onClose}>
