@@ -261,8 +261,8 @@ begin
 
   select *
   into v_account
-  from public.billing_accounts
-  where user_id = p_user_id
+  from public.billing_accounts ba
+  where ba.user_id = p_user_id
   for update;
 
   v_subscription_active :=
@@ -278,17 +278,17 @@ begin
         using errcode = 'P0001';
     end if;
 
-    update public.billing_accounts
-    set monthly_analysis_used = monthly_analysis_used + 1
-    where user_id = p_user_id
-    returning * into v_account;
+    update public.billing_accounts ba
+    set monthly_analysis_used = ba.monthly_analysis_used + 1
+    where ba.user_id = p_user_id
+    returning ba.* into v_account;
 
     v_source := 'subscription';
   elsif v_account.free_analysis_remaining > 0 then
-    update public.billing_accounts
-    set free_analysis_remaining = free_analysis_remaining - 1
-    where user_id = p_user_id
-    returning * into v_account;
+    update public.billing_accounts ba
+    set free_analysis_remaining = ba.free_analysis_remaining - 1
+    where ba.user_id = p_user_id
+    returning ba.* into v_account;
 
     v_source := 'free';
   else
