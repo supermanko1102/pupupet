@@ -39,6 +39,137 @@ export type Database = {
   }
   public: {
     Tables: {
+      analysis_usage: {
+        Row: {
+          billing_period_end: string | null
+          billing_period_start: string | null
+          created_at: string
+          id: string
+          log_id: string
+          refund_reason: string | null
+          refunded_at: string | null
+          source: string
+          user_id: string
+        }
+        Insert: {
+          billing_period_end?: string | null
+          billing_period_start?: string | null
+          created_at?: string
+          id?: string
+          log_id: string
+          refund_reason?: string | null
+          refunded_at?: string | null
+          source: string
+          user_id: string
+        }
+        Update: {
+          billing_period_end?: string | null
+          billing_period_start?: string | null
+          created_at?: string
+          id?: string
+          log_id?: string
+          refund_reason?: string | null
+          refunded_at?: string | null
+          source?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "analysis_usage_log_id_fkey"
+            columns: ["log_id"]
+            isOneToOne: true
+            referencedRelation: "poop_logs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      billing_accounts: {
+        Row: {
+          created_at: string
+          current_period_end: string | null
+          current_period_start: string | null
+          entitlement_id: string | null
+          environment: string | null
+          free_analysis_remaining: number
+          last_revenuecat_event_at: string | null
+          last_synced_at: string | null
+          monthly_analysis_limit: number
+          monthly_analysis_used: number
+          product_id: string | null
+          revenuecat_app_user_id: string
+          store: string | null
+          subscription_status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          entitlement_id?: string | null
+          environment?: string | null
+          free_analysis_remaining?: number
+          last_revenuecat_event_at?: string | null
+          last_synced_at?: string | null
+          monthly_analysis_limit?: number
+          monthly_analysis_used?: number
+          product_id?: string | null
+          revenuecat_app_user_id: string
+          store?: string | null
+          subscription_status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          entitlement_id?: string | null
+          environment?: string | null
+          free_analysis_remaining?: number
+          last_revenuecat_event_at?: string | null
+          last_synced_at?: string | null
+          monthly_analysis_limit?: number
+          monthly_analysis_used?: number
+          product_id?: string | null
+          revenuecat_app_user_id?: string
+          store?: string | null
+          subscription_status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      billing_events: {
+        Row: {
+          app_user_id: string | null
+          created_at: string
+          event_id: string
+          event_type: string
+          processed_at: string | null
+          processing_error: string | null
+          raw_event: Json
+        }
+        Insert: {
+          app_user_id?: string | null
+          created_at?: string
+          event_id: string
+          event_type: string
+          processed_at?: string | null
+          processing_error?: string | null
+          raw_event: Json
+        }
+        Update: {
+          app_user_id?: string | null
+          created_at?: string
+          event_id?: string
+          event_type?: string
+          processed_at?: string | null
+          processing_error?: string | null
+          raw_event?: Json
+        }
+        Relationships: []
+      }
       pets: {
         Row: {
           birthday: string | null
@@ -176,7 +307,43 @@ export type Database = {
           job_image_path: string
         }[]
       }
+      create_photo_analysis_log: {
+        Args: {
+          p_image_path: string
+          p_user_id: string
+        }
+        Returns: {
+          current_period_end: string | null
+          free_analysis_remaining: number
+          image_path: string
+          is_subscribed: boolean
+          log_id: string
+          subscription_analysis_remaining: number
+          usage_source: string
+        }[]
+      }
+      refund_analysis_usage: {
+        Args: {
+          p_log_id: string
+          p_reason?: string
+        }
+        Returns: boolean
+      }
       reset_stuck_jobs: { Args: never; Returns: number }
+      sync_billing_account: {
+        Args: {
+          p_entitlement_id?: string
+          p_environment?: string
+          p_event_at?: string
+          p_period_end?: string
+          p_period_start?: string
+          p_product_id?: string
+          p_store?: string
+          p_subscription_status: string
+          p_user_id: string
+        }
+        Returns: Database["public"]["Tables"]["billing_accounts"]["Row"]
+      }
     }
     Enums: {
       [_ in never]: never

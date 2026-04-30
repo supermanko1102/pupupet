@@ -1,12 +1,15 @@
 import * as ImagePicker from 'expo-image-picker';
+import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Platform } from 'react-native';
 
 import type { AnalysisResult } from '@/components/photo-analysis-modal';
 import { useAssignPet } from '@/hooks/use-pets';
+import { createAnalysisLog } from '@/lib/analysis';
 import { scheduleAbnormalFollowUp } from '@/lib/notifications';
-import { uploadPoopPhoto } from '@/lib/uploads';
+import { deletePoopPhoto, uploadPoopPhoto } from '@/lib/uploads';
 import { supabase } from '@/lib/supabase';
+import { BILLING_KEY, useBilling } from '@/providers/billing-provider';
 import { useSession } from '@/providers/session-provider';
 
 const POLL_INTERVAL_MS = 2000;
@@ -19,7 +22,9 @@ type Props = {
 
 export function usePhotoAnalysisFlow({ onLogsUpdated }: Props) {
   const { user } = useSession();
+  const billing = useBilling();
   const assignPetMutation = useAssignPet();
+  const queryClient = useQueryClient();
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollErrorCountRef = useRef(0);
   const pollInFlightRef = useRef(false);
@@ -155,25 +160,25 @@ export function usePhotoAnalysisFlow({ onLogsUpdated }: Props) {
     setModalPhase('analyzing');
     setIsUploading(true);
 
+    let imagePath: string | null = null;
+
     try {
-      const imagePath = await uploadPoopPhoto(user.id, asset);
-      const { data: newLog, error } = await supabase
-        .from('poop_logs')
-        .insert({ image_path: imagePath, entry_mode: 'photo_ai', status: 'uploaded' })
-        .select('id, image_path')
-        .single();
+      imagePath = await uploadPoopPhoto(user.id, asset);
+      const newLog = await createAnalysisLog(imagePath);
 
-      if (error) throw error;
-
-      setCurrentLogId(newLog.id);
-      startPolling(newLog.id, newLog.image_path!, asset.uri);
+      void queryClient.invalidateQueries({ queryKey: [BILLING_KEY, user.id] });
+      setCurrentLogId(newLog.log_id);
+      startPolling(newLog.log_id, newLog.image_path, asset.uri);
     } catch (error) {
+      if (imagePath) {
+        void deletePoopPhoto(imagePath);
+      }
       Alert.alert('上傳失敗', error instanceof Error ? error.message : '請稍後再試。');
       closePhotoModal();
     } finally {
       setIsUploading(false);
     }
-  }, [closePhotoModal, startPolling, user]);
+  }, [closePhotoModal, queryClient, startPolling, user]);
 
   const assignPet = useCallback(async (petId: string) => {
     if (!currentLogId) return;
@@ -187,6 +192,9 @@ export function usePhotoAnalysisFlow({ onLogsUpdated }: Props) {
       Alert.alert('請使用手機拍照', '拍照分析建議使用 iPhone 或 Android App。');
       return;
     }
+
+    const canAnalyze = await billing.ensureCanAnalyze();
+    if (!canAnalyze) return;
 
     const permission = await ImagePicker.requestCameraPermissionsAsync();
     if (!permission.granted) {
@@ -203,9 +211,12 @@ export function usePhotoAnalysisFlow({ onLogsUpdated }: Props) {
 
     if (result.canceled || !result.assets[0]) return;
     void uploadAsset(result.assets[0]);
-  }, [uploadAsset]);
+  }, [billing, uploadAsset]);
 
   const pickFromLibrary = useCallback(async () => {
+    const canAnalyze = await billing.ensureCanAnalyze();
+    if (!canAnalyze) return;
+
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
       Alert.alert('需要相簿權限', '請先允許 App 存取相簿。');
@@ -221,7 +232,7 @@ export function usePhotoAnalysisFlow({ onLogsUpdated }: Props) {
 
     if (result.canceled || !result.assets[0]) return;
     void uploadAsset(result.assets[0]);
-  }, [uploadAsset]);
+  }, [billing, uploadAsset]);
 
   return {
     analysisResult,

@@ -19,6 +19,7 @@ export default function SettingsLayout() {
         },
       }}>
       <Stack.Screen name="index" options={{ title: '設定' }} />
+      <Stack.Screen name="plus" options={{ title: 'PupuPet Plus' }} />
       <Stack.Screen name="account" options={{ title: '帳號管理' }} />
       <Stack.Screen name="pets/index" options={{ title: '寵物管理' }} />
       <Stack.Screen name="pets/new" options={{ title: '新增寵物' }} />

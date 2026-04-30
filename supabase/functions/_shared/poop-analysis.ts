@@ -300,6 +300,10 @@ async function markJobFailed(id: string, error: string) {
       model_version: MODEL,
     },
   });
+
+  await refundAnalysisUsage(id, error).catch((refundError) => {
+    console.error(`refund for job ${id} failed:`, refundError);
+  });
 }
 
 async function updateLog(id: string, fields: Record<string, unknown>) {
@@ -316,5 +320,24 @@ async function updateLog(id: string, fields: Record<string, unknown>) {
 
   if (!res.ok) {
     throw new Error(`updateLog failed: ${await res.text()}`);
+  }
+}
+
+async function refundAnalysisUsage(logId: string, reason: string) {
+  const res = await fetch(`${supabaseUrl}/rest/v1/rpc/refund_analysis_usage`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${supabaseServiceKey}`,
+      apikey: supabaseServiceKey,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      p_log_id: logId,
+      p_reason: reason.slice(0, 500),
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`refundAnalysisUsage failed: ${await res.text()}`);
   }
 }

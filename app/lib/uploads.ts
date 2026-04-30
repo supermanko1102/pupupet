@@ -35,3 +35,11 @@ export async function uploadPoopPhoto(userId: string, asset: ImagePickerAsset) {
 
   return filePath;
 }
+
+export async function deletePoopPhoto(filePath: string) {
+  if (!supabase) {
+    return;
+  }
+
+  await supabase.storage.from('poop-photos').remove([filePath]);
+}

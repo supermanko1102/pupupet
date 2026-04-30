@@ -11,6 +11,7 @@ export default function SettingsIndexScreen() {
       <ScrollView style={s.scroll} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
         <View style={s.section}>
           <MenuItem icon="paw" label="寵物管理" onPress={() => router.push('/settings/pets' as never)} />
+          <MenuItem icon="sparkles" label="PupuPet Plus" onPress={() => router.push('/settings/plus' as never)} />
           <MenuItem icon="person" label="帳號管理" onPress={() => router.push('/settings/account' as never)} isLast />
         </View>
 
