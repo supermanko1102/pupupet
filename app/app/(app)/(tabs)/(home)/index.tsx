@@ -15,7 +15,6 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { LogDetailModal, type DetailLog } from '@/components/log-detail-modal';
 import { PhotoAnalysisModal } from '@/components/photo-analysis-modal';
-import { QuickLogModal } from '@/components/quick-log-modal';
 import { useLogDetailFlow } from '@/hooks/use-log-detail-flow';
 import { usePets } from '@/hooks/use-pets';
 import { usePhotoAnalysisFlow } from '@/hooks/use-photo-analysis-flow';
@@ -24,7 +23,6 @@ import {
   useTrendSummary,
   type RecentLog,
 } from '@/hooks/use-poop-logs';
-import { useQuickLogFlow } from '@/hooks/use-quick-log-flow';
 import {
   logStatusLabel,
 } from '@/lib/log-utils';
@@ -112,15 +110,9 @@ export default function HomeScreen() {
   const { data: recentLogs = [], isLoading, isRefetching, refetch: refetchLogs } = useRecentLogs();
   const { data: trendSummary } = useTrendSummary();
   const logDetailFlow = useLogDetailFlow();
-  const quickLogFlow = useQuickLogFlow();
   const photoAnalysisFlow = usePhotoAnalysisFlow({
     onLogsUpdated: refetchLogs,
   });
-
-  function handleOpenQuickLog() {
-    lightImpactFeedback();
-    quickLogFlow.openQuickLog();
-  }
 
   function handleStartScan() {
     lightImpactFeedback();
@@ -149,18 +141,6 @@ export default function HomeScreen() {
       onClose={photoAnalysisFlow.closePhotoModal}
     />
 
-    <QuickLogModal
-      visible={quickLogFlow.isVisible}
-      selectedStatus={quickLogFlow.selectedStatus}
-      quickNote={quickLogFlow.quickNote}
-      quickLogDone={quickLogFlow.quickLogDone}
-      isPending={quickLogFlow.isPending}
-      onSelectStatus={quickLogFlow.setSelectedStatus}
-      onChangeNote={quickLogFlow.setQuickNote}
-      onSubmit={() => void quickLogFlow.submitQuickLog()}
-      onClose={quickLogFlow.closeQuickLog}
-    />
-
     <LinearGradient
       colors={['rgba(32, 178, 170, 0.08)', '#ffffff', '#ffffff']}
       start={{ x: 0, y: 0 }}
@@ -180,30 +160,19 @@ export default function HomeScreen() {
 
               <View style={styles.heroSection}>
                 <Text style={styles.heroTitle}>今天記一下</Text>
-                <Text style={styles.heroSubtitle}>每次排便都只要 5 秒</Text>
+                <Text style={styles.heroSubtitle}>拍照分析健康狀況</Text>
               </View>
 
               <View style={styles.ctaRow}>
                 <Pressable
                   style={({ pressed }) => [styles.ctaCard, styles.ctaCardPrimary, pressed && styles.ctaCardPressed]}
-                  onPress={handleOpenQuickLog}
-                  disabled={!user}>
-                  <View style={styles.ctaIconWrap}>
-                    <Ionicons name="flash" size={28} color="#ffffff" />
-                  </View>
-                  <Text style={styles.ctaCardTitle}>快速記錄</Text>
-                  <Text style={styles.ctaCardSub}>選狀態，5 秒完成</Text>
-                </Pressable>
-
-                <Pressable
-                  style={({ pressed }) => [styles.ctaCard, styles.ctaCardSecondary, pressed && styles.ctaCardPressed]}
                   onPress={handleStartScan}
                   disabled={photoAnalysisFlow.isUploading || !user}>
-                  <View style={[styles.ctaIconWrap, { backgroundColor: 'rgba(32,178,170,0.12)' }]}>
-                    <Ionicons name="camera" size={28} color="#20B2AA" />
+                  <View style={styles.ctaIconWrap}>
+                    <Ionicons name="camera" size={28} color="#ffffff" />
                   </View>
-                  <Text style={[styles.ctaCardTitle, { color: '#171d1c' }]}>拍照分析</Text>
-                  <Text style={styles.ctaCardSub}>AI 判讀健康狀況</Text>
+                  <Text style={styles.ctaCardTitle}>拍照分析</Text>
+                  <Text style={styles.ctaCardSub}>使用手機相機建立紀錄</Text>
                 </Pressable>
               </View>
 
@@ -213,7 +182,7 @@ export default function HomeScreen() {
                 onPress={handlePickFromLibrary}
                 disabled={photoAnalysisFlow.isUploading || !user}>
                 <Ionicons name="images-outline" size={16} color="#6c7a78" />
-                <Text style={styles.libraryButtonText}>從相簿選擇</Text>
+                <Text style={styles.libraryButtonText}>從相簿補一筆</Text>
               </Pressable>
 
               <View style={styles.summarySection}>
@@ -302,12 +271,11 @@ const styles = StyleSheet.create({
   heroTitle: { color: '#171d1c', fontSize: 26, fontWeight: '700', textAlign: 'center', letterSpacing: -0.5 },
   heroSubtitle: { color: '#6c7a78', fontSize: 15, textAlign: 'center' },
 
-  // Dual CTA
-  ctaRow: { flexDirection: 'row', gap: 12, paddingHorizontal: 20, width: '100%', marginBottom: 12 },
+  // Primary action
+  ctaRow: { paddingHorizontal: 20, width: '100%', marginBottom: 12 },
   ctaCard: {
     alignItems: 'center',
     borderRadius: 20,
-    flex: 1,
     gap: 8,
     paddingVertical: 24,
     paddingHorizontal: 12,
@@ -319,11 +287,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 14,
     elevation: 8,
-  },
-  ctaCardSecondary: {
-    backgroundColor: '#f5fbf9',
-    borderWidth: 1,
-    borderColor: '#e3e9e8',
   },
   ctaCardPressed: { transform: [{ scale: 0.97 }], opacity: 0.9 },
   ctaIconWrap: {
@@ -337,14 +300,13 @@ const styles = StyleSheet.create({
   ctaCardTitle: { color: '#ffffff', fontSize: 16, fontWeight: '700' },
   ctaCardSub: { color: 'rgba(255,255,255,0.75)', fontSize: 12, textAlign: 'center' },
 
-  // Library button
   libraryButton: {
     alignItems: 'center',
+    borderRadius: 999,
     flexDirection: 'row',
     gap: 6,
     marginBottom: 32,
     overflow: 'hidden',
-    borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },

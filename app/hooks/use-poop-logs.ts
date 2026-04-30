@@ -11,9 +11,6 @@ export { useHistoryLogs, useHistoryLogsForDate } from './logs/use-history-logs';
 
 export { usePoopLog } from './logs/use-poop-log';
 
-export { useQuickLog } from './logs/use-quick-log';
-export type { QuickLogInput } from './logs/use-quick-log';
-
 export { useStats } from './logs/use-stats';
 export type { StatsData } from './logs/use-stats';
 

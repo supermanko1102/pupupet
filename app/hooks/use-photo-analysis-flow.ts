@@ -1,6 +1,6 @@
 import * as ImagePicker from 'expo-image-picker';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 
 import type { AnalysisResult } from '@/components/photo-analysis-modal';
 import { useAssignPet } from '@/hooks/use-pets';
@@ -183,6 +183,11 @@ export function usePhotoAnalysisFlow({ onLogsUpdated }: Props) {
   }, [assignPetMutation, currentLogId, onLogsUpdated]);
 
   const startScan = useCallback(async () => {
+    if (Platform.OS !== 'ios' && Platform.OS !== 'android') {
+      Alert.alert('請使用手機拍照', '拍照分析建議使用 iPhone 或 Android App。');
+      return;
+    }
+
     const permission = await ImagePicker.requestCameraPermissionsAsync();
     if (!permission.granted) {
       Alert.alert('需要相機權限', '請先允許 App 使用相機。');

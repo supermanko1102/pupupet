@@ -19,7 +19,7 @@ export const LEGAL_PAGES: Record<LegalPageKey, LegalPage> = {
     sections: [
       {
         heading: '1. 服務說明',
-        body: 'PupuPet（口袋便便）是一款協助飼主記錄寵物排便狀況的行動應用程式。本服務提供快速記錄、AI 影像分析及健康趨勢摘要等功能。',
+        body: 'PupuPet（口袋便便）是一款協助飼主記錄寵物排便狀況的行動應用程式。本服務提供 AI 影像分析、相簿補登及健康趨勢摘要等功能。',
       },
       {
         heading: '2. 帳號責任',
@@ -46,7 +46,7 @@ export const LEGAL_PAGES: Record<LegalPageKey, LegalPage> = {
     sections: [
       {
         heading: '我們收集哪些資料',
-        body: '• 帳號資訊：Apple 登入提供的電子郵件地址。\n• 記錄資料：您手動輸入的排便時間、性狀、備註，以及所選擇的寵物資訊。\n• 上傳相片：您選擇上傳進行 AI 分析的寵物排便影像。',
+        body: '• 帳號資訊：Apple 登入提供的電子郵件地址。\n• 記錄資料：排便影像的分析結果、記錄時間，以及所選擇的寵物資訊。\n• 上傳相片：您拍攝或選擇上傳進行 AI 分析的寵物排便影像。',
       },
       {
         heading: 'AI 分析如何運作',
