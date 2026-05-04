@@ -8,6 +8,8 @@ import { useAssignPet } from '@/hooks/use-pets';
 import { createAnalysisLog } from '@/lib/analysis';
 import { scheduleAbnormalFollowUp } from '@/lib/notifications';
 import { createCompletedAnalysisResult, createPollingFailureResult, shouldScheduleAnalysisFollowUp } from '@/lib/photo-analysis-result';
+import { PHOTO_PICKER_OPTIONS, firstPickedAsset } from '@/lib/photo-picker';
+import { PollingController } from '@/lib/polling-controller';
 import { deletePoopPhoto, uploadPoopPhoto } from '@/lib/uploads';
 import { supabase } from '@/lib/supabase';
 import { BILLING_KEY, useBilling } from '@/providers/billing-provider';
@@ -26,10 +28,10 @@ export function usePhotoAnalysisFlow({ onLogsUpdated }: Props) {
   const billing = useBilling();
   const assignPetMutation = useAssignPet();
   const queryClient = useQueryClient();
-  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const pollErrorCountRef = useRef(0);
-  const pollInFlightRef = useRef(false);
-  const pollStartedAtRef = useRef<number | null>(null);
+  const pollingRef = useRef(new PollingController<ReturnType<typeof setInterval>>({
+    maxErrors: MAX_POLL_ERRORS,
+    timeoutMs: POLL_TIMEOUT_MS,
+  }));
 
   const [currentLogId, setCurrentLogId] = useState<string | null>(null);
   const [petAssigned, setPetAssigned] = useState(false);
@@ -38,58 +40,49 @@ export function usePhotoAnalysisFlow({ onLogsUpdated }: Props) {
   const [modalPhase, setModalPhase] = useState<'analyzing' | 'result'>('analyzing');
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
 
+  const stopPolling = useCallback(() => {
+    const timer = pollingRef.current.getTimer();
+    if (timer) clearInterval(timer);
+    pollingRef.current.stop();
+  }, []);
+
   const closePhotoModal = useCallback(() => {
-    if (pollingRef.current) clearInterval(pollingRef.current);
-    pollingRef.current = null;
-    pollErrorCountRef.current = 0;
-    pollInFlightRef.current = false;
-    pollStartedAtRef.current = null;
+    stopPolling();
     setCapturedAsset(null);
     setModalPhase('analyzing');
     setAnalysisResult(null);
     setCurrentLogId(null);
     setPetAssigned(false);
-  }, []);
+  }, [stopPolling]);
 
   useEffect(() => {
-    return () => {
-      if (pollingRef.current) clearInterval(pollingRef.current);
-    };
-  }, []);
+    return stopPolling;
+  }, [stopPolling]);
 
   const showPollingFailure = useCallback((
     summary: string,
     previewUri: string,
     recommendation: string | null = '你可以先離開此畫面，稍後到歷程查看是否完成分析。'
   ) => {
-    if (pollingRef.current) clearInterval(pollingRef.current);
-    pollingRef.current = null;
-    pollErrorCountRef.current = 0;
-    pollInFlightRef.current = false;
-    pollStartedAtRef.current = null;
+    stopPolling();
 
     setAnalysisResult(createPollingFailureResult(summary, previewUri, recommendation));
     setModalPhase('result');
     void onLogsUpdated();
-  }, [onLogsUpdated]);
+  }, [onLogsUpdated, stopPolling]);
 
   const startPolling = useCallback((logId: string, imagePath: string, previewUri: string) => {
-    if (pollingRef.current) clearInterval(pollingRef.current);
-    pollErrorCountRef.current = 0;
-    pollInFlightRef.current = false;
-    pollStartedAtRef.current = Date.now();
+    stopPolling();
 
-    pollingRef.current = setInterval(async () => {
+    const timer = setInterval(async () => {
       if (!supabase) return;
-      if (pollInFlightRef.current) return;
+      if (!pollingRef.current.beginRequest()) return;
 
-      const startedAt = pollStartedAtRef.current ?? Date.now();
-      if (Date.now() - startedAt > POLL_TIMEOUT_MS) {
+      if (pollingRef.current.hasTimedOut()) {
+        pollingRef.current.endRequest();
         showPollingFailure('分析時間較長，稍後可在歷程查看結果。', previewUri);
         return;
       }
-
-      pollInFlightRef.current = true;
 
       try {
         const { data, error } = await supabase
@@ -99,20 +92,16 @@ export function usePhotoAnalysisFlow({ onLogsUpdated }: Props) {
           .single();
 
         if (error) {
-          pollErrorCountRef.current += 1;
-          if (pollErrorCountRef.current >= MAX_POLL_ERRORS) {
+          if (pollingRef.current.recordError()) {
             showPollingFailure('連線不穩，暫時無法確認分析結果。', previewUri);
           }
           return;
         }
 
-        pollErrorCountRef.current = 0;
+        pollingRef.current.resetErrors();
 
         if (data?.status === 'done' || data?.status === 'failed') {
-          if (pollingRef.current) clearInterval(pollingRef.current);
-          pollingRef.current = null;
-          pollErrorCountRef.current = 0;
-          pollStartedAtRef.current = null;
+          stopPolling();
 
           const { data: signedData } = await supabase.storage
             .from('poop-photos')
@@ -129,15 +118,16 @@ export function usePhotoAnalysisFlow({ onLogsUpdated }: Props) {
           void onLogsUpdated();
         }
       } catch {
-        pollErrorCountRef.current += 1;
-        if (pollErrorCountRef.current >= MAX_POLL_ERRORS) {
+        if (pollingRef.current.recordError()) {
           showPollingFailure('連線不穩，暫時無法確認分析結果。', previewUri);
         }
       } finally {
-        pollInFlightRef.current = false;
+        pollingRef.current.endRequest();
       }
     }, POLL_INTERVAL_MS);
-  }, [onLogsUpdated, showPollingFailure]);
+
+    pollingRef.current.start(timer);
+  }, [onLogsUpdated, showPollingFailure, stopPolling]);
 
   const uploadAsset = useCallback(async (asset: ImagePicker.ImagePickerAsset) => {
     if (!supabase || !user) return;
@@ -188,15 +178,9 @@ export function usePhotoAnalysisFlow({ onLogsUpdated }: Props) {
       return;
     }
 
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      aspect: [4, 3],
-      mediaTypes: ['images'],
-      quality: 0.85,
-    });
-
-    if (result.canceled || !result.assets[0]) return;
-    void uploadAsset(result.assets[0]);
+    const asset = firstPickedAsset(await ImagePicker.launchCameraAsync(PHOTO_PICKER_OPTIONS));
+    if (!asset) return;
+    void uploadAsset(asset);
   }, [billing, uploadAsset]);
 
   const pickFromLibrary = useCallback(async () => {
@@ -209,15 +193,9 @@ export function usePhotoAnalysisFlow({ onLogsUpdated }: Props) {
       return;
     }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      allowsEditing: true,
-      aspect: [4, 3],
-      mediaTypes: ['images'],
-      quality: 0.85,
-    });
-
-    if (result.canceled || !result.assets[0]) return;
-    void uploadAsset(result.assets[0]);
+    const asset = firstPickedAsset(await ImagePicker.launchImageLibraryAsync(PHOTO_PICKER_OPTIONS));
+    if (!asset) return;
+    void uploadAsset(asset);
   }, [billing, uploadAsset]);
 
   return {
