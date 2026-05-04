@@ -5,9 +5,10 @@ import { Alert, Platform } from 'react-native';
 
 import type { AnalysisResult } from '@/components/photo-analysis-modal';
 import { useAssignPet } from '@/hooks/use-pets';
+import { pollAnalysisOnce, type AnalysisPollerDeps } from '@/lib/analysis-poller';
 import { createAnalysisLog } from '@/lib/analysis';
 import { scheduleAbnormalFollowUp } from '@/lib/notifications';
-import { createCompletedAnalysisResult, createPollingFailureResult, shouldScheduleAnalysisFollowUp } from '@/lib/photo-analysis-result';
+import { createPollingFailureResult, shouldScheduleAnalysisFollowUp } from '@/lib/photo-analysis-result';
 import { PHOTO_PICKER_OPTIONS, firstPickedAsset } from '@/lib/photo-picker';
 import { PollingController } from '@/lib/polling-controller';
 import { deletePoopPhoto, uploadPoopPhoto } from '@/lib/uploads';
@@ -74,55 +75,54 @@ export function usePhotoAnalysisFlow({ onLogsUpdated }: Props) {
   const startPolling = useCallback((logId: string, imagePath: string, previewUri: string) => {
     stopPolling();
 
-    const timer = setInterval(async () => {
-      if (!supabase) return;
-      if (!pollingRef.current.beginRequest()) return;
+    if (!supabase) return;
+    const client = supabase;
 
-      if (pollingRef.current.hasTimedOut()) {
-        pollingRef.current.endRequest();
-        showPollingFailure('分析時間較長，稍後可在歷程查看結果。', previewUri);
-        return;
-      }
-
-      try {
-        const { data, error } = await supabase
+    const deps: AnalysisPollerDeps = {
+      fetchLogStatus: async (id) => {
+        const { data, error } = await client
           .from('poop_logs')
           .select('status, bristol_score, risk_level, summary, recommendation')
-          .eq('id', logId)
+          .eq('id', id)
           .single();
+        return { data, error };
+      },
+      createSignedUrl: async (path) => {
+        const { data } = await client.storage
+          .from('poop-photos')
+          .createSignedUrl(path, 60 * 60);
+        return data?.signedUrl ?? null;
+      },
+    };
 
-        if (error) {
-          if (pollingRef.current.recordError()) {
-            showPollingFailure('連線不穩，暫時無法確認分析結果。', previewUri);
-          }
+    const timer = setInterval(async () => {
+      const outcome = await pollAnalysisOnce({
+        controller: pollingRef.current,
+        deps,
+        imagePath,
+        logId,
+        previewUri,
+      });
+
+      switch (outcome.kind) {
+        case 'pending':
+        case 'skipped':
           return;
-        }
-
-        pollingRef.current.resetErrors();
-
-        if (data?.status === 'done' || data?.status === 'failed') {
+        case 'timeout':
+          showPollingFailure('分析時間較長，稍後可在歷程查看結果。', previewUri);
+          return;
+        case 'fatal-error':
+          showPollingFailure('連線不穩，暫時無法確認分析結果。', previewUri);
+          return;
+        case 'completed':
           stopPolling();
-
-          const { data: signedData } = await supabase.storage
-            .from('poop-photos')
-            .createSignedUrl(imagePath, 60 * 60);
-
-          const result = createCompletedAnalysisResult(data, signedData?.signedUrl ?? previewUri);
-          setAnalysisResult(result);
-
-          if (shouldScheduleAnalysisFollowUp(result.riskLevel)) {
-            void scheduleAbnormalFollowUp(logId);
+          setAnalysisResult(outcome.result);
+          if (shouldScheduleAnalysisFollowUp(outcome.result.riskLevel)) {
+            void scheduleAbnormalFollowUp(outcome.logId);
           }
-
           setModalPhase('result');
           void onLogsUpdated();
-        }
-      } catch {
-        if (pollingRef.current.recordError()) {
-          showPollingFailure('連線不穩，暫時無法確認分析結果。', previewUri);
-        }
-      } finally {
-        pollingRef.current.endRequest();
+          return;
       }
     }, POLL_INTERVAL_MS);
 
