@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { PropsWithChildren, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { PropsWithChildren, createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Alert, Platform } from 'react-native';
 import Purchases, { LOG_LEVEL } from 'react-native-purchases';
 import RevenueCatUI, { PAYWALL_RESULT } from 'react-native-purchases-ui';
@@ -9,7 +9,11 @@ import { supabase } from '@/lib/supabase';
 import { useSession } from '@/providers/session-provider';
 
 const PLUS_ENTITLEMENT_ID = 'plus';
+const PLUS_MONTHLY_PRODUCT_ID = 'pupupet_plus_monthly_v1';
 const BILLING_KEY = 'billing_account';
+
+let configuredRevenueCatUserId: string | null = null;
+let revenueCatConfigureInFlight: Promise<void> | null = null;
 
 type BillingAccount = {
   current_period_end: string | null;
@@ -81,10 +85,59 @@ async function fetchBillingAccount(userId: string) {
   return data as BillingAccount | null;
 }
 
+async function configurePurchasesForUser(userId: string) {
+  if (revenueCatConfigureInFlight) {
+    await revenueCatConfigureInFlight;
+  }
+
+  revenueCatConfigureInFlight = (async () => {
+    await Purchases.setLogLevel(__DEV__ ? LOG_LEVEL.VERBOSE : LOG_LEVEL.WARN);
+
+    const isConfigured = await Purchases.isConfigured().catch(() => false);
+    if (!isConfigured) {
+      Purchases.configure({
+        apiKey: env.revenueCatIosApiKey,
+        appUserID: userId,
+      });
+      configuredRevenueCatUserId = userId;
+      return;
+    }
+
+    if (configuredRevenueCatUserId !== userId) {
+      await Purchases.logIn(userId);
+      configuredRevenueCatUserId = userId;
+    }
+  })();
+
+  try {
+    await revenueCatConfigureInFlight;
+  } finally {
+    revenueCatConfigureInFlight = null;
+  }
+}
+
+async function logRevenueCatProductDiagnostics() {
+  if (!__DEV__ || Platform.OS !== 'ios') return;
+  if (env.revenueCatIosApiKey.startsWith('test_')) {
+    console.log('[RevenueCat] Using Test Store API key; skipping Apple StoreKit product diagnostics.');
+    return;
+  }
+
+  try {
+    const products = await Purchases.getProducts(
+      [PLUS_MONTHLY_PRODUCT_ID],
+      Purchases.PRODUCT_CATEGORY.SUBSCRIPTION,
+    );
+    const identifiers = products.map((product) => product.identifier).join(', ') || '(none)';
+    console.log(`[RevenueCat] StoreKit product diagnostics: requested ${PLUS_MONTHLY_PRODUCT_ID}, received ${products.length}: ${identifiers}`);
+  } catch (error) {
+    console.warn('[RevenueCat] StoreKit product diagnostics failed:', error);
+  }
+}
+
 export function BillingProvider({ children }: PropsWithChildren) {
   const { user } = useSession();
   const queryClient = useQueryClient();
-  const configuredUserIdRef = useRef<string | null>(null);
   const [isRevenueCatReady, setIsRevenueCatReady] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
@@ -107,19 +160,7 @@ export function BillingProvider({ children }: PropsWithChildren) {
       }
 
       try {
-        await Purchases.setLogLevel(__DEV__ ? LOG_LEVEL.VERBOSE : LOG_LEVEL.WARN);
-
-        const isConfigured = await Purchases.isConfigured().catch(() => false);
-        if (!isConfigured) {
-          Purchases.configure({
-            apiKey: env.revenueCatIosApiKey,
-            appUserID: user.id,
-          });
-        } else if (configuredUserIdRef.current !== user.id) {
-          await Purchases.logIn(user.id);
-        }
-
-        configuredUserIdRef.current = user.id;
+        await configurePurchasesForUser(user.id);
         if (isMounted) setIsRevenueCatReady(true);
       } catch (error) {
         console.warn('RevenueCat configuration failed:', error);
@@ -163,13 +204,21 @@ export function BillingProvider({ children }: PropsWithChildren) {
       return false;
     }
 
+    await logRevenueCatProductDiagnostics();
+
     const result = await RevenueCatUI.presentPaywall({
       displayCloseButton: true,
     });
 
     if (result === PAYWALL_RESULT.PURCHASED || result === PAYWALL_RESULT.RESTORED) {
-      const account = await refreshBilling();
-      return remainingFor(account) > 0;
+      try {
+        const account = await refreshBilling();
+        return remainingFor(account) > 0;
+      } catch (error) {
+        console.warn('RevenueCat purchase succeeded, but billing sync failed:', error);
+        Alert.alert('訂閱已完成，狀態同步失敗', error instanceof Error ? error.message : '請稍後再試，或聯絡客服協助同步。');
+        return false;
+      }
     }
 
     return false;

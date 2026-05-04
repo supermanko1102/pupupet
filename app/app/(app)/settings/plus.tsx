@@ -1,4 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -17,10 +19,19 @@ function formatDate(value: string | null | undefined) {
 export default function PlusScreen() {
   const billing = useBilling();
   const account = billing.account;
+  const refreshBilling = billing.refreshBilling;
   const isBusy = billing.isLoading || billing.isSyncing;
   const used = account?.monthly_analysis_used ?? 0;
   const limit = account?.monthly_analysis_limit ?? 60;
   const freeRemaining = account?.free_analysis_remaining ?? 0;
+
+  useFocusEffect(
+    useCallback(() => {
+      void refreshBilling().catch((error) => {
+        console.warn('Billing refresh failed:', error);
+      });
+    }, [refreshBilling])
+  );
 
   return (
     <SafeAreaView style={s.screen} edges={['bottom']}>
