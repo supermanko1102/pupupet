@@ -4,7 +4,7 @@ import { Alert } from 'react-native';
 import Purchases from 'react-native-purchases';
 import RevenueCatUI, { PAYWALL_RESULT } from 'react-native-purchases-ui';
 
-import { BILLING_ACCOUNT_SELECT, BillingAccount, SyncBillingResponse, isActiveSubscription, remainingAnalysesFor } from '@/lib/billing';
+import { BILLING_ACCOUNT_SELECT, BillingAccount, SyncBillingResponse, evaluateAnalysisAccess, isActiveSubscription, remainingAnalysesFor } from '@/lib/billing';
 import { canUseRevenueCatPurchases, configurePurchasesForUser, logRevenueCatProductDiagnostics } from '@/lib/revenuecat';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/providers/session-provider';
@@ -145,30 +145,30 @@ export function BillingProvider({ children }: PropsWithChildren) {
   const ensureCanAnalyze = useCallback(async () => {
     if (!user) return false;
 
-    let freshAccount = await fetchBillingAccount(user.id).catch(() => billingQuery.data ?? null);
-    if (remainingAnalysesFor(freshAccount) > 0) {
-      return true;
+    function notifyMonthlyExhausted() {
+      Alert.alert('本月額度已用完', 'PupuPet Plus 每月包含 60 次 AI 分析，將於下一個訂閱週期重置。');
     }
 
-    if (isActiveSubscription(freshAccount)) {
-      Alert.alert('本月額度已用完', 'PupuPet Plus 每月包含 60 次 AI 分析，將於下一個訂閱週期重置。');
+    // 1) 先用最新的快取（fall back 到 query data 如果讀取失敗）
+    let account = await fetchBillingAccount(user.id).catch(() => billingQuery.data ?? null);
+    let access = evaluateAnalysisAccess(account);
+    if (access.kind === 'ok') return true;
+    if (access.kind === 'monthly_exhausted') {
+      notifyMonthlyExhausted();
       return false;
     }
 
-    freshAccount = await refreshBilling().catch(() => freshAccount);
-    if (remainingAnalysesFor(freshAccount) > 0) {
-      return true;
-    }
-
-    if (isActiveSubscription(freshAccount)) {
-      Alert.alert('本月額度已用完', 'PupuPet Plus 每月包含 60 次 AI 分析，將於下一個訂閱週期重置。');
+    // 2) 免費額度看似用完 — 強制 sync 一次（RevenueCat → DB），避免本地落後
+    account = await refreshBilling().catch(() => account);
+    access = evaluateAnalysisAccess(account);
+    if (access.kind === 'ok') return true;
+    if (access.kind === 'monthly_exhausted') {
+      notifyMonthlyExhausted();
       return false;
     }
 
-    const purchased = await showPaywall();
-    if (purchased) {
-      return true;
-    }
+    // 3) 還是 free_exhausted → 引導付費
+    if (await showPaywall()) return true;
 
     Alert.alert('需要 PupuPet Plus', '免費分析次數已用完，訂閱後即可繼續使用 AI 分析。');
     return false;

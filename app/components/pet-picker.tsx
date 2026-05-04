@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Ripple } from '@/constants/theme';
 import { petSpeciesEmoji } from '@/lib/pet-display';
 import type { Database } from '@/types/database';
 
@@ -11,8 +12,6 @@ type Props = {
   variant?: 'card' | 'compact';
   disabled?: boolean;
 };
-
-const BUTTON_RIPPLE = { color: 'rgba(23, 29, 28, 0.08)' };
 
 export function PetPicker({ pets, onSelect, variant = 'card', disabled = false }: Props) {
   if (pets.length === 0) return null;
@@ -26,7 +25,7 @@ export function PetPicker({ pets, onSelect, variant = 'card', disabled = false }
       {pets.map((pet) => (
         <Pressable
           key={pet.id}
-          android_ripple={BUTTON_RIPPLE}
+          android_ripple={Ripple.onLight}
           disabled={disabled}
           onPress={() => onSelect(pet.id)}
           style={({ pressed }) => [buttonStyle, pressed && styles.pressed]}>

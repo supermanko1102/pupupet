@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 
-import { StatusColors } from '@/constants/theme';
+import { Ripple, StatusColors } from '@/constants/theme';
 import {
   formatDateKeyLabel,
   formatShortDate,
@@ -79,7 +79,7 @@ export function HistoryHeader({
           return (
             <Pressable
               key={option.key}
-              android_ripple={BUTTON_RIPPLE}
+              android_ripple={Ripple.onLight}
               style={({ pressed }) => [
                 styles.rangeButton,
                 isSelected && styles.rangeButtonSelected,
@@ -109,7 +109,7 @@ export function HistoryHeader({
         </View>
         {selectedDate ? (
           <Pressable
-            android_ripple={BUTTON_RIPPLE}
+            android_ripple={Ripple.onLight}
             style={({ pressed }) => [styles.clearDateButton, pressed && styles.buttonPressed]}
             onPress={handleClearDate}>
             <Ionicons name="close" size={16} color="#3c4948" />
@@ -120,7 +120,7 @@ export function HistoryHeader({
 
       <View style={styles.filterRow}>
         <Pressable
-          android_ripple={BUTTON_RIPPLE}
+          android_ripple={Ripple.onLight}
           style={({ pressed }) => [
             styles.filterButton,
             !abnormalOnly && styles.filterButtonSelected,
@@ -132,7 +132,7 @@ export function HistoryHeader({
           </Text>
         </Pressable>
         <Pressable
-          android_ripple={BUTTON_RIPPLE}
+          android_ripple={Ripple.onLight}
           style={({ pressed }) => [
             styles.filterButton,
             abnormalOnly && styles.filterButtonSelected,
@@ -317,7 +317,7 @@ function RecordDaysStrip({
             return (
               <Pressable
                 key={day.dateKey}
-                android_ripple={BUTTON_RIPPLE}
+                android_ripple={Ripple.onLight}
                 style={({ pressed }) => [
                   styles.abnormalChip,
                   { borderColor: riskAccentColor(day.riskLevel) },
@@ -365,8 +365,6 @@ function recordDayIcon(riskLevel: RiskLevel) {
   if (riskLevel === 'normal') return 'checkmark-circle-outline';
   return 'ellipse-outline';
 }
-
-const BUTTON_RIPPLE = { color: 'rgba(23, 29, 28, 0.08)' };
 
 const styles = StyleSheet.create({
   headerWrap: { gap: 14, paddingBottom: 6, paddingHorizontal: 20, paddingTop: 12 },

@@ -34,6 +34,13 @@ export const Brand = {
   secondary: '#93a4a1',
 } as const;
 
+// ─── Pressable tokens ────────────────────────────────────────────────────────
+// Android ripple colors used by Pressable across the app.
+export const Ripple = {
+  onLight: { color: 'rgba(23, 29, 28, 0.08)' },
+  onDark: { color: 'rgba(255, 255, 255, 0.18)' },
+} as const;
+
 // ─── Status tokens ────────────────────────────────────────────────────────────
 // Used by log-utils, status-pill, and any risk/tone display.
 export const StatusColors = {

@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { modalStyles as ms } from '@/components/modal-styles';
 import { PetPicker } from '@/components/pet-picker';
+import { Ripple } from '@/constants/theme';
 import { lightImpactFeedback, selectionFeedback } from '@/lib/haptics';
 import { riskBannerStyle, riskIcon, riskTitle } from '@/lib/log-utils';
 import type { Database } from '@/types/database';
@@ -120,7 +121,7 @@ export function PhotoAnalysisModal({
                       <Text style={styles.petPickerTitle}>這是哪一隻的紀錄？</Text>
                       <PetPicker pets={pets} onSelect={handleAssignPet} />
                       <Pressable
-                        android_ripple={BUTTON_RIPPLE}
+                        android_ripple={Ripple.onLight}
                         style={({ pressed }) => [styles.petPickerSkipButton, pressed && styles.buttonPressed]}
                         onPress={handleClose}>
                         <Text style={styles.petPickerSkip}>略過，之後再分類</Text>
@@ -134,7 +135,7 @@ export function PhotoAnalysisModal({
             <View style={ms.modalActions}>
               {(petAssigned || analysisResult.failed) && (
                 <Pressable
-                  android_ripple={BUTTON_RIPPLE_ON_DARK}
+                  android_ripple={Ripple.onDark}
                   style={({ pressed }) => [
                     ms.modalButton,
                     ms.primaryButton,
@@ -176,6 +177,3 @@ const styles = StyleSheet.create({
   modalButton:    { overflow: 'hidden' },
   buttonPressed:  { opacity: 0.72 },
 });
-
-const BUTTON_RIPPLE = { color: 'rgba(23, 29, 28, 0.08)' };
-const BUTTON_RIPPLE_ON_DARK = { color: 'rgba(255, 255, 255, 0.18)' };

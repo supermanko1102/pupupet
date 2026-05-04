@@ -28,3 +28,14 @@ export function remainingAnalysesFor(account: BillingAccount | null) {
   }
   return account.free_analysis_remaining;
 }
+
+export type AnalysisAccess =
+  | { kind: 'ok' }
+  | { kind: 'monthly_exhausted' }    // 訂閱者本月用完
+  | { kind: 'free_exhausted' };      // 免費額度用完，需要訂閱
+
+export function evaluateAnalysisAccess(account: BillingAccount | null): AnalysisAccess {
+  if (remainingAnalysesFor(account) > 0) return { kind: 'ok' };
+  if (isActiveSubscription(account)) return { kind: 'monthly_exhausted' };
+  return { kind: 'free_exhausted' };
+}

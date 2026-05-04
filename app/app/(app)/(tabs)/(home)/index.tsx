@@ -1,8 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import {
-  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -13,93 +11,17 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
+import { NotificationDebugPanel } from '@/components/dev/notification-debug-panel';
 import { LogDetailModal } from '@/components/log-detail-content';
 import { PhotoAnalysisModal } from '@/components/photo-analysis-modal';
+import { Ripple } from '@/constants/theme';
 import { useLogDetailFlow } from '@/hooks/use-log-detail-flow';
 import { usePets } from '@/hooks/use-pets';
 import { usePhotoAnalysisFlow } from '@/hooks/use-photo-analysis-flow';
-import {
-  useRecentLogs,
-  useTrendSummary,
-  type RecentLog,
-} from '@/hooks/use-poop-logs';
-import {
-  logStatusLabel,
-} from '@/lib/log-utils';
+import { useRecentLogs, useTrendSummary } from '@/hooks/use-poop-logs';
+import { logStatusLabel } from '@/lib/log-utils';
 import { lightImpactFeedback } from '@/lib/haptics';
-import { cancelFollowUp } from '@/lib/notifications';
 import { useSession } from '@/providers/session-provider';
-
-// ─── DEV ONLY: 通知測試面板 ───────────────────────────────────────────────────
-
-function DebugPanel({
-  recentLogs,
-  onOpenFollowUp,
-}: {
-  recentLogs: RecentLog[];
-  onOpenFollowUp: (log: RecentLog) => void;
-}) {
-  const firstAbnormal = recentLogs.find(
-    (l) => l.riskLevel === 'vet' || l.riskLevel === 'observe'
-  ) ?? recentLogs[0];
-
-  async function scheduleIn5Seconds() {
-    await cancelFollowUp(firstAbnormal.id);
-    await Notifications.scheduleNotificationAsync({
-      identifier: `follow_up_${firstAbnormal.id}`,
-      content: {
-        title: '記得追蹤昨天的異常',
-        body: '（測試）昨天有記錄到異常狀況，今天排便後記得再記錄一次。',
-        data: { logId: firstAbnormal.id, type: 'abnormal_follow_up' },
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-        seconds: 5,
-        repeats: false,
-      },
-    });
-    Alert.alert('✅ 通知已排程', '5 秒後點擊測試 tap → navigate 流程');
-  }
-
-  return (
-    <View style={debugStyles.panel}>
-      <Text style={debugStyles.title}>🛠 DEV: 通知測試</Text>
-      <Text style={debugStyles.target} numberOfLines={1}>
-        目標 log：{firstAbnormal.id.slice(0, 8)}… ({firstAbnormal.riskLevel ?? firstAbnormal.manualStatus})
-      </Text>
-      <Pressable style={debugStyles.btn} onPress={() => onOpenFollowUp(firstAbnormal)}>
-        <Text style={debugStyles.btnText}>直接開 Follow-up Modal</Text>
-      </Pressable>
-      <Pressable style={[debugStyles.btn, debugStyles.btnSecondary]} onPress={() => void scheduleIn5Seconds()}>
-        <Text style={[debugStyles.btnText, { color: '#3c4948' }]}>排一個 5 秒後的通知</Text>
-      </Pressable>
-    </View>
-  );
-}
-
-const debugStyles = StyleSheet.create({
-  panel: {
-    backgroundColor: '#fef9c3',
-    borderColor: '#fde047',
-    borderRadius: 16,
-    borderWidth: 1,
-    gap: 8,
-    marginHorizontal: 20,
-    marginTop: 24,
-    padding: 16,
-    width: '100%',
-  },
-  title: { color: '#713f12', fontSize: 13, fontWeight: '700' },
-  target: { color: '#92400e', fontSize: 12 },
-  btn: {
-    alignItems: 'center',
-    backgroundColor: '#20B2AA',
-    borderRadius: 10,
-    paddingVertical: 10,
-  },
-  btnSecondary: { backgroundColor: '#e9efed' },
-  btnText: { color: '#ffffff', fontSize: 14, fontWeight: '600' },
-});
 
 // ─── Home Screen ──────────────────────────────────────────────────────────────
 
@@ -177,7 +99,7 @@ export default function HomeScreen() {
               </View>
 
               <Pressable
-                android_ripple={BUTTON_RIPPLE}
+                android_ripple={Ripple.onLight}
                 style={({ pressed }) => [styles.libraryButton, pressed && styles.buttonPressed]}
                 onPress={handlePickFromLibrary}
                 disabled={photoAnalysisFlow.isUploading || !user}>
@@ -210,7 +132,7 @@ export default function HomeScreen() {
 
                   <View style={styles.summaryActionRow}>
                     <Pressable
-                      android_ripple={BUTTON_RIPPLE_ON_DARK}
+                      android_ripple={Ripple.onDark}
                       style={({ pressed }) => [
                         styles.summaryActionButton,
                         styles.summaryActionPrimary,
@@ -230,8 +152,8 @@ export default function HomeScreen() {
                 </View>
               )}
 
-              {__DEV__ && recentLogs.length > 0 && (
-                <DebugPanel
+              {__DEV__ && (
+                <NotificationDebugPanel
                   recentLogs={recentLogs}
                   onOpenFollowUp={(log) => logDetailFlow.openLogDetail(log, { isFollowUp: true })}
                 />
@@ -255,9 +177,6 @@ export default function HomeScreen() {
 
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
-
-const BUTTON_RIPPLE = { color: 'rgba(23, 29, 28, 0.08)' };
-const BUTTON_RIPPLE_ON_DARK = { color: 'rgba(255, 255, 255, 0.18)' };
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
