@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
-import { LogDetailModal, type DetailLog } from '@/components/log-detail-modal';
+import { LogDetailModal } from '@/components/log-detail-content';
 import { PhotoAnalysisModal } from '@/components/photo-analysis-modal';
 import { useLogDetailFlow } from '@/hooks/use-log-detail-flow';
 import { usePets } from '@/hooks/use-pets';
@@ -37,7 +37,7 @@ function DebugPanel({
   onOpenFollowUp,
 }: {
   recentLogs: RecentLog[];
-  onOpenFollowUp: (log: DetailLog) => void;
+  onOpenFollowUp: (log: RecentLog) => void;
 }) {
   const firstAbnormal = recentLogs.find(
     (l) => l.riskLevel === 'vet' || l.riskLevel === 'observe'
@@ -244,7 +244,8 @@ export default function HomeScreen() {
 
     <LogDetailModal
       log={logDetailFlow.detailLog}
-      isFollowUp={logDetailFlow.isFollowUp}
+      variant={logDetailFlow.isFollowUp ? 'follow-up' : 'default'}
+      showEntryModeRow
       onClose={logDetailFlow.closeLogDetail}
     />
     </>

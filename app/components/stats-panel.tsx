@@ -1,4 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -8,45 +9,11 @@ import {
   View,
 } from 'react-native';
 
-import { effectiveRisk, poopLogsKeys, useStats } from '@/hooks/use-poop-logs';
+import { poopLogsKeys, useStats } from '@/hooks/use-poop-logs';
+import { buildRecentDays, type DayMetric } from '@/lib/history-metrics';
 import { useSession } from '@/providers/session-provider';
-import type { Database } from '@/types/database';
 
-type RiskLevel = Database['public']['Tables']['poop_logs']['Row']['risk_level'];
-type LogRow = NonNullable<ReturnType<typeof useStats>['data']>['rows'][number];
-
-type DayActivity = {
-  date: string;       // 'YYYY-MM-DD'
-  label: string;      // '週一' etc.
-  riskLevel: RiskLevel | null;  // worst risk of the day, null = no log
-};
-
-
-const WEEK_LABELS = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
-
-function buildLast7Days(logs: LogRow[]): DayActivity[] {
-  const days: DayActivity[] = [];
-  const now = new Date();
-
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - i);
-    const dateStr = d.toISOString().slice(0, 10);
-    const label = WEEK_LABELS[d.getDay()];
-
-    const dayLogs = logs.filter((l) => l.captured_at.slice(0, 10) === dateStr);
-    let riskLevel: RiskLevel | null = null;
-    if (dayLogs.some((l) => effectiveRisk(l) === 'vet')) riskLevel = 'vet';
-    else if (dayLogs.some((l) => effectiveRisk(l) === 'observe')) riskLevel = 'observe';
-    else if (dayLogs.some((l) => effectiveRisk(l) === 'normal')) riskLevel = 'normal';
-
-    days.push({ date: dateStr, label, riskLevel });
-  }
-  return days;
-}
-
-function DayDot({ day }: { day: DayActivity }) {
-  const isToday = day.date === new Date().toISOString().slice(0, 10);
+function DayDot({ day }: { day: DayMetric }) {
   const color =
     day.riskLevel === 'normal' ? '#20B2AA' :
     day.riskLevel === 'observe' ? '#f59e0b' :
@@ -54,8 +21,8 @@ function DayDot({ day }: { day: DayActivity }) {
 
   return (
     <View style={styles.dayItem}>
-      <View style={[styles.dayDot, { backgroundColor: color }, isToday && styles.dayDotToday]} />
-      <Text style={[styles.dayLabel, isToday && styles.dayLabelToday]}>{day.label}</Text>
+      <View style={[styles.dayDot, { backgroundColor: color }, day.isToday && styles.dayDotToday]} />
+      <Text style={[styles.dayLabel, day.isToday && styles.dayLabelToday]}>週{day.weekday}</Text>
     </View>
   );
 }
@@ -74,9 +41,10 @@ export function StatsPanel() {
   const queryClient = useQueryClient();
   const { data: statsData, isLoading, isRefetching, refetch } = useStats();
 
-  const stats = statsData
-    ? { ...statsData, last7Days: buildLast7Days(statsData.rows) }
-    : null;
+  const last7Days = useMemo(
+    () => (statsData ? buildRecentDays(statsData.rows, 7) : []),
+    [statsData]
+  );
 
   function handleRefresh() {
     void queryClient.invalidateQueries({ queryKey: poopLogsKeys.stats(user?.id) });
@@ -91,8 +59,8 @@ export function StatsPanel() {
     );
   }
 
-  const healthRate = stats && stats.total > 0
-    ? Math.round((stats.normal / stats.total) * 100)
+  const healthRate = statsData && statsData.total > 0
+    ? Math.round((statsData.normal / statsData.total) * 100)
     : null;
 
   return (
@@ -110,10 +78,10 @@ export function StatsPanel() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>健康概覽</Text>
         <View style={styles.cardRow}>
-          <SummaryCard count={stats?.total ?? 0} label="總記錄" color="#20B2AA" />
-          <SummaryCard count={stats?.normal ?? 0} label="正常" color="#16a34a" />
-          <SummaryCard count={stats?.observe ?? 0} label="觀察" color="#f59e0b" />
-          <SummaryCard count={stats?.vet ?? 0} label="就醫" color="#ef4444" />
+          <SummaryCard count={statsData?.total ?? 0} label="總記錄" color="#20B2AA" />
+          <SummaryCard count={statsData?.normal ?? 0} label="正常" color="#16a34a" />
+          <SummaryCard count={statsData?.observe ?? 0} label="觀察" color="#f59e0b" />
+          <SummaryCard count={statsData?.vet ?? 0} label="就醫" color="#ef4444" />
         </View>
         {healthRate !== null && (
           <View style={styles.rateRow}>
@@ -127,8 +95,8 @@ export function StatsPanel() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>過去 7 天</Text>
         <View style={styles.weekRow}>
-          {stats?.last7Days.map((day) => (
-            <DayDot key={day.date} day={day} />
+          {last7Days.map((day) => (
+            <DayDot key={day.dateKey} day={day} />
           ))}
         </View>
         <View style={styles.legend}>
@@ -151,7 +119,7 @@ export function StatsPanel() {
         </View>
       </View>
 
-      {stats?.total === 0 && (
+      {statsData?.total === 0 && (
         <Text style={styles.emptyHint}>開始拍照記錄，統計資料就會出現在這裡。</Text>
       )}
 

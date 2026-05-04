@@ -3,7 +3,7 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
-import { HistoryLogDetailContent } from '@/components/history-log-detail-content';
+import { LogDetailContent } from '@/components/log-detail-content';
 import { usePoopLog } from '@/hooks/use-poop-logs';
 
 export default function FollowUpScreen() {
@@ -25,10 +25,11 @@ export default function FollowUpScreen() {
           <Text style={styles.errorSubtext}>可能已被刪除，或尚未同步完成。</Text>
         </View>
       ) : (
-        <HistoryLogDetailContent
-          footerVariant="follow-up"
+        <LogDetailContent
+          variant="follow-up"
           log={log}
           onClose={() => router.replace('/' as never)}
+          showQuickModeTag
         />
       )}
     </SafeAreaView>

@@ -15,15 +15,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { settingsRouteStyles as shared } from '@/components/settings/route-shared';
 import { useCreatePet, useDeletePet, usePets, useUpdatePet } from '@/hooks/use-pets';
+import { petSpeciesEmoji } from '@/lib/pet-display';
 import type { Database } from '@/types/database';
 
 type Pet = Database['public']['Tables']['pets']['Row'];
 type Species = Pet['species'];
 
 const SPECIES_OPTIONS: { value: Species; label: string }[] = [
-  { value: 'dog', label: '🐶 狗' },
-  { value: 'cat', label: '🐱 貓' },
-  { value: 'other', label: '🐾 其他' },
+  { value: 'dog', label: `${petSpeciesEmoji('dog')} 狗` },
+  { value: 'cat', label: `${petSpeciesEmoji('cat')} 貓` },
+  { value: 'other', label: `${petSpeciesEmoji('other')} 其他` },
 ];
 
 export default function PetEditorScreen() {

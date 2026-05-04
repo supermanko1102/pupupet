@@ -3,7 +3,7 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
-import { HistoryLogDetailContent } from '@/components/history-log-detail-content';
+import { LogDetailContent } from '@/components/log-detail-content';
 import { useAssignPet, usePets } from '@/hooks/use-pets';
 import { usePoopLog } from '@/hooks/use-poop-logs';
 
@@ -33,12 +33,13 @@ export default function LogDetailScreen() {
           <Text style={styles.errorSubtext}>可能已被刪除，或尚未同步完成。</Text>
         </View>
       ) : (
-        <HistoryLogDetailContent
+        <LogDetailContent
           isAssigningPet={assignPetMutation.isPending}
           log={log}
           onAssignPet={(petId) => void assignPet(petId)}
           onClose={() => router.back()}
           pets={pets}
+          showQuickModeTag
         />
       )}
     </SafeAreaView>
