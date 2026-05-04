@@ -6,6 +6,7 @@
     "dev": "expo start",
     "ios": "expo run:ios",
     "start": "expo start",
+    "test": "vitest run",
     "web": "expo start --web",
     "lint": "expo lint",
     "eas:configure": "eas build:configure",
@@ -59,7 +60,8 @@
     "@types/react": "~19.1.0",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~55.0.0",
-    "typescript": "~5.9.2"
+    "typescript": "~5.9.2",
+    "vitest": "^4.1.5"
   },
   "private": true
 }

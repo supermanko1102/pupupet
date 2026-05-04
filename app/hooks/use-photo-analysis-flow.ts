@@ -7,6 +7,7 @@ import type { AnalysisResult } from '@/components/photo-analysis-modal';
 import { useAssignPet } from '@/hooks/use-pets';
 import { createAnalysisLog } from '@/lib/analysis';
 import { scheduleAbnormalFollowUp } from '@/lib/notifications';
+import { createCompletedAnalysisResult, createPollingFailureResult, shouldScheduleAnalysisFollowUp } from '@/lib/photo-analysis-result';
 import { deletePoopPhoto, uploadPoopPhoto } from '@/lib/uploads';
 import { supabase } from '@/lib/supabase';
 import { BILLING_KEY, useBilling } from '@/providers/billing-provider';
@@ -67,14 +68,7 @@ export function usePhotoAnalysisFlow({ onLogsUpdated }: Props) {
     pollInFlightRef.current = false;
     pollStartedAtRef.current = null;
 
-    setAnalysisResult({
-      imageUrl: previewUri,
-      bristolScore: null,
-      failed: true,
-      recommendation,
-      riskLevel: null,
-      summary,
-    });
+    setAnalysisResult(createPollingFailureResult(summary, previewUri, recommendation));
     setModalPhase('result');
     void onLogsUpdated();
   }, [onLogsUpdated]);
@@ -124,18 +118,10 @@ export function usePhotoAnalysisFlow({ onLogsUpdated }: Props) {
             .from('poop-photos')
             .createSignedUrl(imagePath, 60 * 60);
 
-          const resolvedRiskLevel = data.status === 'failed' ? null : data.risk_level;
+          const result = createCompletedAnalysisResult(data, signedData?.signedUrl ?? previewUri);
+          setAnalysisResult(result);
 
-          setAnalysisResult({
-            imageUrl: signedData?.signedUrl ?? previewUri,
-            bristolScore: data.bristol_score,
-            failed: data.status === 'failed',
-            recommendation: data.status === 'failed' ? null : data.recommendation,
-            riskLevel: resolvedRiskLevel,
-            summary: data.status === 'failed' ? '分析失敗，請重新拍照。' : data.summary,
-          });
-
-          if (resolvedRiskLevel === 'vet' || resolvedRiskLevel === 'observe') {
+          if (shouldScheduleAnalysisFollowUp(result.riskLevel)) {
             void scheduleAbnormalFollowUp(logId);
           }
 

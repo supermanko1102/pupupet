@@ -5,29 +5,11 @@ import {
   HttpError,
   jsonResponse,
 } from '../_shared/billing.ts';
+import { AnalysisInputError, parseAnalysisImagePath } from '../_shared/analysis-input.ts';
 
 type CreateAnalysisBody = {
   imagePath?: unknown;
 };
-
-function parseImagePath(body: CreateAnalysisBody, userId: string) {
-  if (typeof body.imagePath !== 'string' || !body.imagePath.trim()) {
-    throw new HttpError(400, 'Missing image path', 'invalid_request');
-  }
-
-  const imagePath = body.imagePath.trim();
-  const expectedPrefix = `${userId}/`;
-  if (!imagePath.startsWith(expectedPrefix)) {
-    throw new HttpError(403, 'Image does not belong to the authenticated user', 'forbidden');
-  }
-
-  const fileName = imagePath.slice(expectedPrefix.length);
-  if (!fileName || fileName.includes('/')) {
-    throw new HttpError(400, 'Invalid image path', 'invalid_request');
-  }
-
-  return { fileName, imagePath };
-}
 
 Deno.serve(async (req) => {
   if (req.method !== 'POST') {
@@ -38,7 +20,7 @@ Deno.serve(async (req) => {
     const adminClient = createAdminClient();
     const user = await getAuthenticatedUser(req, adminClient);
     const body = await req.json().catch(() => ({})) as CreateAnalysisBody;
-    const { fileName, imagePath } = parseImagePath(body, user.id);
+    const { fileName, imagePath } = parseAnalysisImagePath(body.imagePath, user.id);
 
     const { data: objects, error: listError } = await adminClient.storage
       .from('poop-photos')
@@ -70,6 +52,10 @@ Deno.serve(async (req) => {
     const log = Array.isArray(data) ? data[0] : data;
     return jsonResponse({ log });
   } catch (error) {
+    if (error instanceof AnalysisInputError) {
+      return errorResponse(new HttpError(error.status, error.message, error.code));
+    }
+
     console.error('create-analysis-log error:', error);
     return errorResponse(error);
   }

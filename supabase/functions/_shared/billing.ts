@@ -1,7 +1,8 @@
 import { createClient, type User } from 'npm:@supabase/supabase-js@2';
 
-export const PLUS_ENTITLEMENT_ID = 'plus';
-const LEGACY_PLUS_ENTITLEMENT_ID = 'entlabef9aca35';
+import { DEFAULT_PLUS_ENTITLEMENT_ID, findPlusEntitlement } from './revenuecat-entitlements.ts';
+
+export const PLUS_ENTITLEMENT_ID = DEFAULT_PLUS_ENTITLEMENT_ID;
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 
@@ -16,16 +17,9 @@ type BillingAccount = {
   user_id: string;
 };
 
-type RevenueCatEntitlement = {
-  expires_date?: string | null;
-  grace_period_expires_date?: string | null;
-  product_identifier?: string | null;
-  purchase_date?: string | null;
-};
-
 type RevenueCatSubscriberResponse = {
   subscriber?: {
-    entitlements?: Record<string, RevenueCatEntitlement | undefined>;
+    entitlements?: Parameters<typeof findPlusEntitlement>[0];
   };
 };
 
@@ -140,28 +134,6 @@ function getRevenueCatApiKey() {
   return key;
 }
 
-function getPlusEntitlementCandidates() {
-  const configured = Deno.env.get('REVENUECAT_PLUS_ENTITLEMENT_ID')?.trim();
-  return [
-    configured,
-    PLUS_ENTITLEMENT_ID,
-    LEGACY_PLUS_ENTITLEMENT_ID,
-  ].filter((value, index, values): value is string => !!value && values.indexOf(value) === index);
-}
-
-function findPlusEntitlement(entitlements: Record<string, RevenueCatEntitlement | undefined> | undefined) {
-  if (!entitlements) return { entitlement: null, entitlementId: null };
-
-  for (const entitlementId of getPlusEntitlementCandidates()) {
-    const entitlement = entitlements[entitlementId];
-    if (entitlement) {
-      return { entitlement, entitlementId };
-    }
-  }
-
-  return { entitlement: null, entitlementId: null };
-}
-
 async function fetchRevenueCatSubscriber(appUserId: string): Promise<RevenueCatSubscriberResponse | null> {
   const response = await fetch(`https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(appUserId)}`, {
     headers: {
@@ -187,7 +159,10 @@ export async function syncBillingFromRevenueCat(
   eventAt?: Date | null
 ) {
   const subscriber = await fetchRevenueCatSubscriber(appUserId);
-  const { entitlement, entitlementId } = findPlusEntitlement(subscriber?.subscriber?.entitlements);
+  const { entitlement, entitlementId } = findPlusEntitlement(
+    subscriber?.subscriber?.entitlements,
+    Deno.env.get('REVENUECAT_PLUS_ENTITLEMENT_ID')
+  );
   const expiresAt = parseDate(entitlement?.expires_date ?? null);
   const graceExpiresAt = parseDate(entitlement?.grace_period_expires_date ?? null);
   const effectiveEnd = isFuture(expiresAt) ? expiresAt : graceExpiresAt;
