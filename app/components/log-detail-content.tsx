@@ -13,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { modalStyles as ms } from '@/components/modal-styles';
 import { PetPicker } from '@/components/pet-picker';
 import { Button } from '@/components/ui';
-import { manualStatusBg, manualStatusEmoji, manualStatusLabel, riskBannerStyle, riskIcon, riskTitle } from '@/lib/logs/log-utils';
+import { riskBannerStyle, riskIcon, riskTitle } from '@/lib/logs/log-utils';
 import { cancelFollowUp, scheduleAbnormalFollowUp } from '@/lib/notifications';
 import type { HistoryLog } from '@/hooks/use-poop-logs';
 import type { Database } from '@/types/database';
@@ -25,8 +25,6 @@ type Props = {
   log: HistoryLog;
   onClose: () => void;
   variant?: 'default' | 'follow-up';
-  showEntryModeRow?: boolean;
-  showQuickModeTag?: boolean;
   pets?: Pet[];
   onAssignPet?: (petId: string) => void;
   isAssigningPet?: boolean;
@@ -36,8 +34,6 @@ export function LogDetailContent({
   log,
   onClose,
   variant = 'default',
-  showEntryModeRow = false,
-  showQuickModeTag = false,
   pets = [],
   onAssignPet,
   isAssigningPet = false,
@@ -46,13 +42,7 @@ export function LogDetailContent({
 
   return (
     <ScrollView style={ms.resultScroll} contentContainerStyle={ms.resultContent}>
-      {log.entryMode === 'quick_log' ? (
-        <View style={[styles.quickBanner, { backgroundColor: manualStatusBg(log.manualStatus) }]}>
-          <Text style={styles.quickEmoji}>{manualStatusEmoji(log.manualStatus)}</Text>
-          <Text style={styles.quickLabel}>{manualStatusLabel(log.manualStatus)}</Text>
-          {showQuickModeTag ? <Text style={styles.quickModeTag}>快速記錄</Text> : null}
-        </View>
-      ) : log.imageUrl ? (
+      {log.imageUrl ? (
         <Image source={{ uri: log.imageUrl }} style={ms.resultImage} contentFit="cover" />
       ) : (
         <View style={[ms.resultImage, styles.imageFallback]}>
@@ -61,21 +51,19 @@ export function LogDetailContent({
       )}
 
       <View style={ms.resultBody}>
-        {log.entryMode === 'photo_ai' && (
-          <View style={[ms.riskBanner, riskBannerStyle(log.riskLevel)]}>
-            <Text style={ms.riskBannerIcon}>{riskIcon(log.riskLevel)}</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={[ms.riskBannerTitle, { color: riskBannerStyle(log.riskLevel).textColor }]}>
-                {riskTitle(log.riskLevel)}
+        <View style={[ms.riskBanner, riskBannerStyle(log.riskLevel)]}>
+          <Text style={ms.riskBannerIcon}>{riskIcon(log.riskLevel)}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={[ms.riskBannerTitle, { color: riskBannerStyle(log.riskLevel).textColor }]}>
+              {riskTitle(log.riskLevel)}
+            </Text>
+            {log.summary ? (
+              <Text style={[ms.riskBannerSub, { color: riskBannerStyle(log.riskLevel).textColor }]}>
+                {log.summary}
               </Text>
-              {log.summary ? (
-                <Text style={[ms.riskBannerSub, { color: riskBannerStyle(log.riskLevel).textColor }]}>
-                  {log.summary}
-                </Text>
-              ) : null}
-            </View>
+            ) : null}
           </View>
-        )}
+        </View>
 
         {log.note ? (
           <View style={ms.recommendBox}>
@@ -116,13 +104,6 @@ export function LogDetailContent({
           <Text style={styles.infoLabel}>時間</Text>
           <Text style={styles.infoValue}>{new Date(log.capturedAt).toLocaleString('zh-TW')}</Text>
         </View>
-
-        {showEntryModeRow ? (
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>記錄方式</Text>
-            <Text style={styles.infoValue}>{log.entryMode === 'quick_log' ? '快速記錄' : '拍照分析'}</Text>
-          </View>
-        ) : null}
       </View>
 
       {isFollowUp && log.riskLevel !== 'normal' ? (
@@ -163,11 +144,6 @@ export function LogDetailModal({ log, ...rest }: ModalProps) {
 
 const styles = StyleSheet.create({
   imageFallback: { alignItems: 'center', backgroundColor: Surface.bgMuted, justifyContent: 'center' },
-
-  quickBanner: { alignItems: 'center', gap: 8, justifyContent: 'center', paddingVertical: 48 },
-  quickEmoji: { fontSize: 56 },
-  quickLabel: { color: Surface.inkSoft, fontSize: 22, fontWeight: '700' },
-  quickModeTag: { color: Surface.muted, fontSize: 13 },
 
   infoRow: {
     alignItems: 'center', backgroundColor: Surface.bgSoft, borderRadius: 12,

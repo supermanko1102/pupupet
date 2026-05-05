@@ -2,34 +2,8 @@ import { StatusColors } from '@/constants/theme';
 import type { Database } from '@/types/database';
 
 type RiskLevel = Database['public']['Tables']['poop_logs']['Row']['risk_level'];
-type ManualStatus = Database['public']['Tables']['poop_logs']['Row']['manual_status'];
 
 export type LogTone = 'danger' | 'neutral' | 'success' | 'warning';
-
-// ─── Manual Status ────────────────────────────────────────────────────────────
-
-export function manualStatusLabel(status: ManualStatus): string {
-  if (status === 'normal') return '正常';
-  if (status === 'soft') return '偏軟';
-  if (status === 'hard') return '偏硬';
-  if (status === 'abnormal') return '異常';
-  return '未知';
-}
-
-export function manualStatusEmoji(status: ManualStatus): string {
-  if (status === 'normal') return '✅';
-  if (status === 'soft') return '🟡';
-  if (status === 'hard') return '🟤';
-  if (status === 'abnormal') return '🚨';
-  return '❓';
-}
-
-export function manualStatusBg(status: ManualStatus): string {
-  if (status === 'normal') return StatusColors.normal.bg;
-  if (status === 'soft' || status === 'hard') return StatusColors.observe.bg;
-  if (status === 'abnormal') return StatusColors.vet.bg;
-  return StatusColors.neutral.bg;
-}
 
 // ─── Risk Level ───────────────────────────────────────────────────────────────
 
@@ -62,17 +36,14 @@ export function riskBannerStyle(riskLevel: RiskLevel): {
   return { backgroundColor: c.bg, borderColor: c.border, textColor: c.text };
 }
 
-// ─── Log Status (unified for both entry modes) ────────────────────────────────
+// ─── Log Status ───────────────────────────────────────────────────────────────
 
 type LogLike = {
-  entryMode: 'quick_log' | 'photo_ai';
-  manualStatus: ManualStatus;
   riskLevel: RiskLevel;
   status: string;
 };
 
 export function logStatusLabel(log: LogLike): string {
-  if (log.entryMode === 'quick_log') return manualStatusLabel(log.manualStatus);
   if (log.status !== 'done') return '分析中';
   if (log.riskLevel === 'normal') return '正常';
   if (log.riskLevel === 'observe') return '觀察';
@@ -81,12 +52,6 @@ export function logStatusLabel(log: LogLike): string {
 }
 
 export function logStatusTone(log: LogLike): LogTone {
-  if (log.entryMode === 'quick_log') {
-    if (log.manualStatus === 'normal') return 'success';
-    if (log.manualStatus === 'abnormal') return 'danger';
-    if (log.manualStatus === 'soft' || log.manualStatus === 'hard') return 'warning';
-    return 'neutral';
-  }
   if (log.riskLevel === 'normal') return 'success';
   if (log.riskLevel === 'observe') return 'warning';
   if (log.riskLevel === 'vet') return 'danger';

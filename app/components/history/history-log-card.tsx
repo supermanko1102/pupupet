@@ -6,8 +6,6 @@ import { StatusPill } from '@/components/status-pill';
 import {
   logStatusLabel,
   logStatusTone,
-  manualStatusBg,
-  manualStatusEmoji,
   toneBorderColor,
 } from '@/lib/logs/log-utils';
 import { formatLogDate } from '@/lib/logs/history-metrics';
@@ -32,11 +30,7 @@ export function HistoryLogCard({ log, onPress }: { log: HistoryLog; onPress: () 
         pressed && styles.cardPressed,
       ]}
       onPress={handlePress}>
-      {log.entryMode === 'quick_log' ? (
-        <View style={[styles.cardQuickThumb, { backgroundColor: manualStatusBg(log.manualStatus) }]}>
-          <Text style={styles.cardQuickEmoji}>{manualStatusEmoji(log.manualStatus)}</Text>
-        </View>
-      ) : log.imageUrl ? (
+      {log.imageUrl ? (
         <Image source={{ uri: log.imageUrl }} style={styles.cardImage} contentFit="cover" />
       ) : (
         <View style={[styles.cardImage, styles.cardImageFallback]}>
@@ -49,11 +43,7 @@ export function HistoryLogCard({ log, onPress }: { log: HistoryLog; onPress: () 
           <StatusPill label={logStatusLabel(log)} tone={tone} />
         </View>
         <View style={styles.cardMetaRow}>
-          <Ionicons
-            name={log.entryMode === 'photo_ai' ? 'camera-outline' : 'flash-outline'}
-            size={13}
-            color="#6c7a78"
-          />
+          <Ionicons name="camera-outline" size={13} color="#6c7a78" />
           <Text style={styles.cardDate}>
             {formatLogDate(log.capturedAt)}
           </Text>
@@ -83,14 +73,6 @@ const styles = StyleSheet.create({
   cardPressed: { opacity: 0.75 },
   cardImage: { borderRadius: 12, height: 74, width: 74 },
   cardImageFallback: { alignItems: 'center', backgroundColor: Surface.bgMuted, justifyContent: 'center' },
-  cardQuickThumb: {
-    alignItems: 'center',
-    borderRadius: 12,
-    height: 74,
-    justifyContent: 'center',
-    width: 74,
-  },
-  cardQuickEmoji: { fontSize: 30 },
   cardBody: { flex: 1, gap: 5, justifyContent: 'center', minWidth: 0 },
   cardRow: { alignItems: 'center', flexDirection: 'row', gap: 8, justifyContent: 'space-between' },
   cardPetName: { color: Surface.ink, flex: 1, fontSize: 15, fontWeight: '700' },

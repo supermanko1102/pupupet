@@ -1,5 +1,5 @@
 import { logStatusTone } from '@/lib/logs/log-utils';
-import { effectiveRisk, type HistoryLog, type LogSignal, type RiskLevel } from '@/hooks/use-poop-logs';
+import type { HistoryLog, LogSignal, RiskLevel } from '@/hooks/use-poop-logs';
 
 export type RangeKey = '7d' | '30d';
 
@@ -16,7 +16,6 @@ export type DayMetric = {
   isToday: boolean;
   normalCount: number;
   observeCount: number;
-  photoCount: number;
   riskLevel: RiskLevel;
   vetCount: number;
   weekday: string;
@@ -25,7 +24,6 @@ export type DayMetric = {
 export type RangeSummary = {
   abnormalDays: number;
   normalRate: number | null;
-  photoCount: number;
   totalCount: number;
 };
 
@@ -90,7 +88,6 @@ export function buildRecentDays(rows: LogSignal[], dayCount: number): DayMetric[
       isToday: dateKey === toDateKey(today),
       normalCount: metric?.normalCount ?? 0,
       observeCount: metric?.observeCount ?? 0,
-      photoCount: metric?.photoCount ?? 0,
       riskLevel: metric?.riskLevel ?? null,
       vetCount: metric?.vetCount ?? 0,
       weekday: WEEKDAY_LABELS[date.getDay()],
@@ -122,7 +119,6 @@ export function buildCurrentMonthDays(rows: LogSignal[]): DayMetric[] {
       isToday: dateKey === todayKey,
       normalCount: metric?.normalCount ?? 0,
       observeCount: metric?.observeCount ?? 0,
-      photoCount: metric?.photoCount ?? 0,
       riskLevel: metric?.riskLevel ?? null,
       vetCount: metric?.vetCount ?? 0,
       weekday: WEEKDAY_LABELS[date.getDay()],
@@ -147,7 +143,6 @@ export function buildLoggedDays(rows: LogSignal[]): DayMetric[] {
       isToday: dateKey === todayKey,
       normalCount: metric.normalCount,
       observeCount: metric.observeCount,
-      photoCount: metric.photoCount,
       riskLevel: metric.riskLevel,
       vetCount: metric.vetCount,
       weekday: WEEKDAY_LABELS[date.getDay()],
@@ -159,12 +154,10 @@ export function buildRangeSummary(days: DayMetric[]): RangeSummary {
   const totalCount = days.reduce((sum, day) => sum + day.count, 0);
   const normalCount = days.reduce((sum, day) => sum + day.normalCount, 0);
   const abnormalDays = days.filter((day) => isAbnormalRisk(day.riskLevel)).length;
-  const photoCount = days.reduce((sum, day) => sum + day.photoCount, 0);
 
   return {
     abnormalDays,
     normalRate: totalCount > 0 ? Math.round((normalCount / totalCount) * 100) : null,
-    photoCount,
     totalCount,
   };
 }
@@ -227,7 +220,6 @@ function buildDailyMetricMap(rows: LogSignal[]) {
     count: number;
     normalCount: number;
     observeCount: number;
-    photoCount: number;
     riskLevel: RiskLevel;
     vetCount: number;
   }>();
@@ -238,14 +230,12 @@ function buildDailyMetricMap(rows: LogSignal[]) {
       count: 0,
       normalCount: 0,
       observeCount: 0,
-      photoCount: 0,
       riskLevel: null,
       vetCount: 0,
     };
-    const riskLevel = effectiveRisk(row);
+    const riskLevel = row.risk_level;
 
     current.count += 1;
-    current.photoCount += row.entry_mode === 'photo_ai' ? 1 : 0;
     current.normalCount += riskLevel === 'normal' ? 1 : 0;
     current.observeCount += riskLevel === 'observe' ? 1 : 0;
     current.vetCount += riskLevel === 'vet' ? 1 : 0;

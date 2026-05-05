@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/providers/session-provider';
-import { effectiveRisk, fetchDoneLogSignals, poopLogsKeys } from './shared';
+import { fetchDoneLogSignals, poopLogsKeys } from './shared';
 import type { LogSignal } from './shared';
 
 export type StatsData = {
@@ -25,9 +25,9 @@ export function useStats() {
 
       return {
         total: rows.length,
-        normal: rows.filter((r) => effectiveRisk(r) === 'normal').length,
-        observe: rows.filter((r) => effectiveRisk(r) === 'observe').length,
-        vet: rows.filter((r) => effectiveRisk(r) === 'vet').length,
+        normal: rows.filter((r) => r.risk_level === 'normal').length,
+        observe: rows.filter((r) => r.risk_level === 'observe').length,
+        vet: rows.filter((r) => r.risk_level === 'vet').length,
         rows,
       } satisfies StatsData;
     },

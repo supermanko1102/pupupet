@@ -30,7 +30,6 @@ export default function FollowUpScreen() {
           variant="follow-up"
           log={log}
           onClose={() => router.replace('/' as never)}
-          showQuickModeTag
         />
       )}
     </SafeAreaView>

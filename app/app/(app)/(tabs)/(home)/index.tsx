@@ -167,7 +167,6 @@ export default function HomeScreen() {
     <LogDetailModal
       log={logDetailFlow.detailLog}
       variant={logDetailFlow.isFollowUp ? 'follow-up' : 'default'}
-      showEntryModeRow
       onClose={logDetailFlow.closeLogDetail}
     />
     </>

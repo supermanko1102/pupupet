@@ -39,7 +39,7 @@ export function NotificationDebugPanel({ recentLogs, onOpenFollowUp }: Props) {
     <View style={styles.panel}>
       <Text style={styles.title}>🛠 DEV: 通知測試</Text>
       <Text style={styles.target} numberOfLines={1}>
-        目標 log：{firstAbnormal.id.slice(0, 8)}… ({firstAbnormal.riskLevel ?? firstAbnormal.manualStatus})
+        目標 log：{firstAbnormal.id.slice(0, 8)}… ({firstAbnormal.riskLevel ?? '未分析'})
       </Text>
       <Pressable style={styles.btn} onPress={() => onOpenFollowUp(firstAbnormal)}>
         <Text style={styles.btnText}>直接開 Follow-up Modal</Text>

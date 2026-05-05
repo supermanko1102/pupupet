@@ -40,7 +40,6 @@ export default function LogDetailScreen() {
           onAssignPet={(petId) => void assignPet(petId)}
           onClose={() => router.back()}
           pets={pets}
-          showQuickModeTag
         />
       )}
     </SafeAreaView>

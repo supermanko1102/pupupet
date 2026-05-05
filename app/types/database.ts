@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       analysis_usage: {
@@ -215,10 +190,8 @@ export type Database = {
           confidence: number | null
           consistency: string | null
           created_at: string
-          entry_mode: string
           id: string
-          image_path: string | null
-          manual_status: string | null
+          image_path: string
           model_version: string | null
           note: string | null
           pet_id: string | null
@@ -236,10 +209,8 @@ export type Database = {
           confidence?: number | null
           consistency?: string | null
           created_at?: string
-          entry_mode?: string
           id?: string
-          image_path?: string | null
-          manual_status?: string | null
+          image_path: string
           model_version?: string | null
           note?: string | null
           pet_id?: string | null
@@ -257,10 +228,8 @@ export type Database = {
           confidence?: number | null
           consistency?: string | null
           created_at?: string
-          entry_mode?: string
           id?: string
-          image_path?: string | null
-          manual_status?: string | null
+          image_path?: string
           model_version?: string | null
           note?: string | null
           pet_id?: string | null
@@ -308,12 +277,9 @@ export type Database = {
         }[]
       }
       create_photo_analysis_log: {
-        Args: {
-          p_image_path: string
-          p_user_id: string
-        }
+        Args: { p_image_path: string; p_user_id: string }
         Returns: {
-          current_period_end: string | null
+          current_period_end: string
           free_analysis_remaining: number
           image_path: string
           is_subscribed: boolean
@@ -323,10 +289,7 @@ export type Database = {
         }[]
       }
       refund_analysis_usage: {
-        Args: {
-          p_log_id: string
-          p_reason?: string
-        }
+        Args: { p_log_id: string; p_reason?: string }
         Returns: boolean
       }
       reset_stuck_jobs: { Args: never; Returns: number }
@@ -342,7 +305,30 @@ export type Database = {
           p_subscription_status: string
           p_user_id: string
         }
-        Returns: Database["public"]["Tables"]["billing_accounts"]["Row"]
+        Returns: {
+          created_at: string
+          current_period_end: string | null
+          current_period_start: string | null
+          entitlement_id: string | null
+          environment: string | null
+          free_analysis_remaining: number
+          last_revenuecat_event_at: string | null
+          last_synced_at: string | null
+          monthly_analysis_limit: number
+          monthly_analysis_used: number
+          product_id: string | null
+          revenuecat_app_user_id: string
+          store: string | null
+          subscription_status: string
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "billing_accounts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
     }
     Enums: {
@@ -472,9 +458,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {},
   },

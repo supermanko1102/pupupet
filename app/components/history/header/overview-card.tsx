@@ -40,7 +40,6 @@ export function OverviewCard({
         <MetricTile label={`${rangeLabel}紀錄`} value={`${rangeSummary.totalCount}`} />
         <MetricTile label="正常率" value={rangeSummary.normalRate === null ? '--' : `${rangeSummary.normalRate}%`} />
         <MetricTile label="異常天數" value={`${rangeSummary.abnormalDays}`} />
-        <MetricTile label="拍照筆數" value={`${rangeSummary.photoCount}`} />
       </View>
     </View>
   );

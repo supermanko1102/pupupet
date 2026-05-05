@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/providers/session-provider';
-import { effectiveRisk, fetchDoneLogSignals, poopLogsKeys } from './shared';
+import { fetchDoneLogSignals, poopLogsKeys } from './shared';
 
 export type TrendSummary = {
   message: string;
@@ -25,10 +25,9 @@ export function useTrendSummary() {
       }
 
       const now = Date.now();
-      const abnormalIdx = rows.findIndex((r) => {
-        const risk = effectiveRisk(r);
-        return risk === 'vet' || risk === 'observe';
-      });
+      const abnormalIdx = rows.findIndex(
+        (r) => r.risk_level === 'vet' || r.risk_level === 'observe'
+      );
 
       let lastAbnormalDaysAgo: number | null = null;
       if (abnormalIdx !== -1) {
@@ -36,7 +35,7 @@ export function useTrendSummary() {
         lastAbnormalDaysAgo = Math.floor(ms / (1000 * 60 * 60 * 24));
       }
 
-      const recentNormal = rows.slice(0, 5).every((r) => effectiveRisk(r) === 'normal');
+      const recentNormal = rows.slice(0, 5).every((r) => r.risk_level === 'normal');
       const hasRecentAbnormal = abnormalIdx !== -1 && abnormalIdx < 3;
 
       let message: string;
@@ -46,7 +45,7 @@ export function useTrendSummary() {
         message = `今天有一次異常，留意後續狀況`;
       } else if (hasRecentAbnormal && lastAbnormalDaysAgo === 1) {
         message = `昨天有一次異常，今天記得觀察`;
-      } else if (lastAbnormalDaysAgo !== null && lastAbnormalDaysAgo <= 7 && effectiveRisk(rows[0]) === 'normal') {
+      } else if (lastAbnormalDaysAgo !== null && lastAbnormalDaysAgo <= 7 && rows[0].risk_level === 'normal') {
         message = `${lastAbnormalDaysAgo} 天前有異常，目前恢復正常`;
       } else if (rows.length < 3) {
         message = `已記錄 ${rows.length} 次，繼續累積`;

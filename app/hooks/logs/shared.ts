@@ -2,13 +2,9 @@ import { supabase } from '@/lib/supabase';
 import type { Database } from '@/types/database';
 
 export type RiskLevel = Database['public']['Tables']['poop_logs']['Row']['risk_level'];
-export type ManualStatus = Database['public']['Tables']['poop_logs']['Row']['manual_status'];
-export type EntryMode = 'quick_log' | 'photo_ai';
 
 export type LogSignal = {
   captured_at: string;
-  entry_mode: string;
-  manual_status: ManualStatus;
   risk_level: RiskLevel;
 };
 
@@ -35,24 +31,9 @@ const LOG_WITH_PET_SELECT = [
   'risk_level',
   'bristol_score',
   'pet_id',
-  'entry_mode',
-  'manual_status',
   'note',
   'pets(name)',
 ].join(', ');
-
-// ─── Shared helper ────────────────────────────────────────────────────────────
-
-export function effectiveRisk(row: { entry_mode: string; risk_level: RiskLevel; manual_status: ManualStatus }): RiskLevel {
-  if (row.entry_mode === 'photo_ai') return row.risk_level;
-  switch (row.manual_status) {
-    case 'normal': return 'normal';
-    case 'soft':
-    case 'hard': return 'observe';
-    case 'abnormal': return 'vet';
-    default: return null;
-  }
-}
 
 function requireSupabase() {
   if (!supabase) {
@@ -91,11 +72,9 @@ export async function batchSignedUrls(paths: (string | null)[]): Promise<Map<str
 export type HistoryLog = {
   bristolScore: number | null;
   capturedAt: string;
-  entryMode: EntryMode;
   id: string;
   imagePath: string | null;
   imageUrl: string | null;
-  manualStatus: ManualStatus;
   note: string | null;
   petId: string | null;
   petName: string;
@@ -110,10 +89,8 @@ export type RecentLog = HistoryLog;
 export type HistoryRow = {
   bristol_score: number | null;
   captured_at: string;
-  entry_mode: string | null;
   id: string;
   image_path: string | null;
-  manual_status: ManualStatus;
   note: string | null;
   pet_id: string | null;
   pets: { name: string } | null;
@@ -132,11 +109,9 @@ export function mapHistoryRow(row: HistoryRow, signedUrlMap: Map<string, string>
   return {
     bristolScore: row.bristol_score ?? null,
     capturedAt: row.captured_at,
-    entryMode: (row.entry_mode ?? 'photo_ai') as EntryMode,
     id: row.id,
     imagePath: row.image_path ?? null,
     imageUrl: row.image_path ? (signedUrlMap.get(row.image_path) ?? null) : null,
-    manualStatus: row.manual_status,
     note: row.note ?? null,
     petId: row.pet_id ?? null,
     petName,
@@ -219,7 +194,7 @@ export async function fetchDoneLogSignals(limit?: number): Promise<LogSignal[]> 
   const client = requireSupabase();
   let query = client
     .from('poop_logs')
-    .select('captured_at, risk_level, entry_mode, manual_status')
+    .select('captured_at, risk_level')
     .eq('status', 'done')
     .order('captured_at', { ascending: false });
 
