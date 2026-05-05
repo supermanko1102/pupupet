@@ -1,8 +1,8 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Ripple } from '@/constants/theme';
 import { petSpeciesEmoji } from '@/lib/pet-display';
 import type { Database } from '@/types/database';
+import { Ripple, Surface } from '@/constants/theme';
 
 type Pet = Database['public']['Tables']['pets']['Row'];
 
@@ -43,8 +43,8 @@ const styles = StyleSheet.create({
 
   cardButton: {
     alignItems: 'center',
-    backgroundColor: '#f5fbf9',
-    borderColor: '#e3e9e8',
+    backgroundColor: Surface.bgSoft,
+    borderColor: Surface.border,
     borderRadius: 12,
     borderWidth: 1,
     flexDirection: 'row',
@@ -54,12 +54,12 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   cardEmoji: { fontSize: 18 },
-  cardName: { color: '#171d1c', fontSize: 15, fontWeight: '600' },
+  cardName: { color: Surface.ink, fontSize: 15, fontWeight: '600' },
 
   compactButton: {
     alignItems: 'center',
     backgroundColor: '#ffffff',
-    borderColor: '#e3e9e8',
+    borderColor: Surface.border,
     borderRadius: 10,
     borderWidth: 1,
     flexDirection: 'row',
@@ -69,5 +69,5 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   compactEmoji: { fontSize: 16 },
-  compactName: { color: '#171d1c', fontSize: 14, fontWeight: '600' },
+  compactName: { color: Surface.ink, fontSize: 14, fontWeight: '600' },
 });

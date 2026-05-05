@@ -1,4 +1,4 @@
-import { logStatusTone } from '@/lib/log-utils';
+import { logStatusTone } from '@/lib/logs/log-utils';
 import { effectiveRisk, type HistoryLog, type LogSignal, type RiskLevel } from '@/hooks/use-poop-logs';
 
 export type RangeKey = '7d' | '30d';

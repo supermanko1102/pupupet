@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { settingsRouteStyles as shared } from '@/components/settings/route-shared';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/providers/session-provider';
+import { Surface } from '@/constants/theme';
 
 export default function SettingsAccountScreen() {
   const { user } = useSession();
@@ -59,8 +60,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
-  infoLabel: { color: '#6c7a78', fontSize: 15 },
-  infoValue: { color: '#171d1c', flex: 1, fontSize: 15, textAlign: 'right' },
+  infoLabel: { color: Surface.muted, fontSize: 15 },
+  infoValue: { color: Surface.ink, flex: 1, fontSize: 15, textAlign: 'right' },
   signOutButton: {
     alignItems: 'center',
     backgroundColor: '#fde8e8',

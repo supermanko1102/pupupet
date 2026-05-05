@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { getUploadFileExtension } from '@/lib/upload-path';
+import { getUploadFileExtension } from '@/lib/photos/upload-path';
 
 describe('upload helpers', () => {
   it('uses a lowercase extension from the asset file name', () => {

@@ -2,7 +2,6 @@ import { Image } from 'expo-image';
 import {
   ActivityIndicator,
   Modal,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,10 +12,12 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { modalStyles as ms } from '@/components/modal-styles';
 import { PetPicker } from '@/components/pet-picker';
-import { manualStatusBg, manualStatusEmoji, manualStatusLabel, riskBannerStyle, riskIcon, riskTitle } from '@/lib/log-utils';
+import { Button } from '@/components/ui';
+import { manualStatusBg, manualStatusEmoji, manualStatusLabel, riskBannerStyle, riskIcon, riskTitle } from '@/lib/logs/log-utils';
 import { cancelFollowUp, scheduleAbnormalFollowUp } from '@/lib/notifications';
 import type { HistoryLog } from '@/hooks/use-poop-logs';
 import type { Database } from '@/types/database';
+import { Surface } from '@/constants/theme';
 
 type Pet = Database['public']['Tables']['pets']['Row'];
 
@@ -127,22 +128,19 @@ export function LogDetailContent({
       {isFollowUp && log.riskLevel !== 'normal' ? (
         <View style={ms.modalActions}>
           <Text style={styles.followUpLabel}>今天恢復正常了嗎？</Text>
-          <Pressable
-            style={[ms.modalButton, ms.primaryButton]}
-            onPress={() => { void cancelFollowUp(log.id); onClose(); }}>
-            <Text style={ms.primaryButtonText}>已恢復正常</Text>
-          </Pressable>
-          <Pressable
-            style={[ms.modalButton, ms.ghostButton]}
-            onPress={() => { void scheduleAbnormalFollowUp(log.id); onClose(); }}>
-            <Text style={ms.ghostButtonText}>仍在觀察中，明天再提醒</Text>
-          </Pressable>
+          <Button
+            label="已恢復正常"
+            onPress={() => { void cancelFollowUp(log.id); onClose(); }}
+          />
+          <Button
+            label="仍在觀察中，明天再提醒"
+            variant="ghost"
+            onPress={() => { void scheduleAbnormalFollowUp(log.id); onClose(); }}
+          />
         </View>
       ) : (
         <View style={ms.modalActions}>
-          <Pressable style={[ms.modalButton, ms.primaryButton]} onPress={onClose}>
-            <Text style={ms.primaryButtonText}>關閉</Text>
-          </Pressable>
+          <Button label="關閉" onPress={onClose} />
         </View>
       )}
     </ScrollView>
@@ -164,23 +162,23 @@ export function LogDetailModal({ log, ...rest }: ModalProps) {
 }
 
 const styles = StyleSheet.create({
-  imageFallback: { alignItems: 'center', backgroundColor: '#e9efed', justifyContent: 'center' },
+  imageFallback: { alignItems: 'center', backgroundColor: Surface.bgMuted, justifyContent: 'center' },
 
   quickBanner: { alignItems: 'center', gap: 8, justifyContent: 'center', paddingVertical: 48 },
   quickEmoji: { fontSize: 56 },
-  quickLabel: { color: '#3c4948', fontSize: 22, fontWeight: '700' },
-  quickModeTag: { color: '#6c7a78', fontSize: 13 },
+  quickLabel: { color: Surface.inkSoft, fontSize: 22, fontWeight: '700' },
+  quickModeTag: { color: Surface.muted, fontSize: 13 },
 
   infoRow: {
-    alignItems: 'center', backgroundColor: '#f5fbf9', borderRadius: 12,
+    alignItems: 'center', backgroundColor: Surface.bgSoft, borderRadius: 12,
     flexDirection: 'row', justifyContent: 'space-between', padding: 14,
   },
-  infoLabel: { color: '#6c7a78', fontSize: 15 },
-  infoValue: { color: '#171d1c', fontSize: 15, fontWeight: '700' },
+  infoLabel: { color: Surface.muted, fontSize: 15 },
+  infoValue: { color: Surface.ink, fontSize: 15, fontWeight: '700' },
 
-  unclassifiedBox: { backgroundColor: '#f5fbf9', borderRadius: 12, gap: 10, padding: 14 },
+  unclassifiedBox: { backgroundColor: Surface.bgSoft, borderRadius: 12, gap: 10, padding: 14 },
   unclassifiedLabel: {
-    color: '#6c7a78',
+    color: Surface.muted,
     fontSize: 13,
     fontWeight: '600',
     letterSpacing: 0.4,
@@ -188,7 +186,7 @@ const styles = StyleSheet.create({
   },
 
   followUpLabel: {
-    color: '#3c4948',
+    color: Surface.inkSoft,
     fontSize: 16,
     fontWeight: '700',
     textAlign: 'center',

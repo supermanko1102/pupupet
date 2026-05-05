@@ -5,7 +5,7 @@ import Purchases from 'react-native-purchases';
 import RevenueCatUI, { PAYWALL_RESULT } from 'react-native-purchases-ui';
 
 import { BILLING_ACCOUNT_SELECT, BillingAccount, SyncBillingResponse, evaluateAnalysisAccess, isActiveSubscription, remainingAnalysesFor } from '@/lib/billing';
-import { canUseRevenueCatPurchases, configurePurchasesForUser, logRevenueCatProductDiagnostics } from '@/lib/revenuecat';
+import { canUseRevenueCatPurchases, configurePurchasesForUser, logRevenueCatProductDiagnostics } from '@/lib/billing/revenuecat';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/providers/session-provider';
 

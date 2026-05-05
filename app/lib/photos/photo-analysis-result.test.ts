@@ -5,7 +5,7 @@ import {
   createCompletedAnalysisResult,
   createPollingFailureResult,
   shouldScheduleAnalysisFollowUp,
-} from '@/lib/photo-analysis-result';
+} from '@/lib/photos/photo-analysis-result';
 
 const completedLog: PolledAnalysisLog = {
   bristol_score: 4,

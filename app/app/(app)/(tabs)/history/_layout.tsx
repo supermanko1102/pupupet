@@ -1,6 +1,6 @@
 import { Stack } from 'expo-router';
 
-import { tabStackScreenOptions } from '@/lib/tab-stack-screen-options';
+import { tabStackScreenOptions } from '@/components/navigation/tab-stack-screen-options';
 
 export default function HistoryTabLayout() {
   return (

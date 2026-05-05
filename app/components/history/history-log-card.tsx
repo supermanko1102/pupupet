@@ -9,10 +9,11 @@ import {
   manualStatusBg,
   manualStatusEmoji,
   toneBorderColor,
-} from '@/lib/log-utils';
-import { formatLogDate } from '@/lib/history-metrics';
+} from '@/lib/logs/log-utils';
+import { formatLogDate } from '@/lib/logs/history-metrics';
 import { lightImpactFeedback } from '@/lib/haptics';
 import type { HistoryLog } from '@/hooks/use-poop-logs';
+import { Surface } from '@/constants/theme';
 
 export function HistoryLogCard({ log, onPress }: { log: HistoryLog; onPress: () => void }) {
   const tone = logStatusTone(log);
@@ -81,7 +82,7 @@ const styles = StyleSheet.create({
   },
   cardPressed: { opacity: 0.75 },
   cardImage: { borderRadius: 12, height: 74, width: 74 },
-  cardImageFallback: { alignItems: 'center', backgroundColor: '#e9efed', justifyContent: 'center' },
+  cardImageFallback: { alignItems: 'center', backgroundColor: Surface.bgMuted, justifyContent: 'center' },
   cardQuickThumb: {
     alignItems: 'center',
     borderRadius: 12,
@@ -92,8 +93,8 @@ const styles = StyleSheet.create({
   cardQuickEmoji: { fontSize: 30 },
   cardBody: { flex: 1, gap: 5, justifyContent: 'center', minWidth: 0 },
   cardRow: { alignItems: 'center', flexDirection: 'row', gap: 8, justifyContent: 'space-between' },
-  cardPetName: { color: '#171d1c', flex: 1, fontSize: 15, fontWeight: '700' },
+  cardPetName: { color: Surface.ink, flex: 1, fontSize: 15, fontWeight: '700' },
   cardMetaRow: { alignItems: 'center', flexDirection: 'row', gap: 5 },
-  cardDate: { color: '#6c7a78', fontSize: 12, fontWeight: '600' },
-  cardSummary: { color: '#3c4948', fontSize: 13, lineHeight: 18, marginTop: 1 },
+  cardDate: { color: Surface.muted, fontSize: 12, fontWeight: '600' },
+  cardSummary: { color: Surface.inkSoft, fontSize: 13, lineHeight: 18, marginTop: 1 },
 });

@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import type { ComponentProps } from 'react';
 
 import { HapticTab } from '@/components/haptic-tab';
+import { Brand, Surface } from '@/constants/theme';
 
 export default function AppLayout() {
   return (
@@ -10,8 +11,8 @@ export default function AppLayout() {
       screenOptions={({ route }) => ({
         headerShown: false,
         sceneStyle: { backgroundColor: '#ffffff' },
-        tabBarActiveTintColor: '#20B2AA',
-        tabBarInactiveTintColor: '#93a4a1',
+        tabBarActiveTintColor: Brand.primary,
+        tabBarInactiveTintColor: Surface.mutedSoft,
         tabBarButton: HapticTab,
         tabBarLabelStyle: {
           fontSize: 11,
@@ -20,7 +21,7 @@ export default function AppLayout() {
         },
         tabBarStyle: {
           backgroundColor: '#ffffff',
-          borderTopColor: '#e3e9e8',
+          borderTopColor: Surface.border,
           height: 72,
           paddingTop: 8,
         },

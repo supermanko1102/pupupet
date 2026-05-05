@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { settingsRouteStyles as shared } from '@/components/settings/route-shared';
 import { LEGAL_PAGES, type LegalPageKey } from '@/components/settings/legal-content';
+import { Surface } from '@/constants/theme';
 
 function isLegalPageKey(value: string): value is LegalPageKey {
   return value === 'terms' || value === 'privacy' || value === 'disclaimer';
@@ -41,7 +42,7 @@ export default function SettingsLegalPageScreen() {
 
 const styles = StyleSheet.create({
   content: { padding: 20, paddingBottom: 48 },
-  meta: { color: '#bbc9c7', fontSize: 13, marginBottom: 20 },
+  meta: { color: Surface.hairline, fontSize: 13, marginBottom: 20 },
   alertBox: {
     alignItems: 'flex-start',
     backgroundColor: '#fde8e8',
@@ -53,6 +54,6 @@ const styles = StyleSheet.create({
   },
   alertText: { color: '#9a3412', flex: 1, fontSize: 14, fontWeight: '600', lineHeight: 20 },
   section: { gap: 6, marginBottom: 24 },
-  heading: { color: '#171d1c', fontSize: 15, fontWeight: '700' },
+  heading: { color: Surface.ink, fontSize: 15, fontWeight: '700' },
   body: { color: '#444f4e', fontSize: 14, lineHeight: 22 },
 });

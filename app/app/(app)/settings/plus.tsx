@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { settingsRouteStyles as s } from '@/components/settings/route-shared';
 import { useBilling } from '@/providers/billing-provider';
+import { Brand, Surface } from '@/constants/theme';
 
 function formatDate(value: string | null | undefined) {
   if (!value) return '尚未啟用';
@@ -115,18 +116,18 @@ const styles = StyleSheet.create({
   },
   heroIcon: {
     alignItems: 'center',
-    backgroundColor: '#20B2AA',
+    backgroundColor: Brand.primary,
     borderRadius: 16,
     height: 56,
     justifyContent: 'center',
     width: 56,
   },
-  heroSub: { color: '#6c7a78', fontSize: 14, textAlign: 'center' },
-  heroTitle: { color: '#171d1c', fontSize: 24, fontWeight: '700', textAlign: 'center' },
-  metricLabel: { color: '#6c7a78', fontSize: 14 },
+  heroSub: { color: Surface.muted, fontSize: 14, textAlign: 'center' },
+  heroTitle: { color: Surface.ink, fontSize: 24, fontWeight: '700', textAlign: 'center' },
+  metricLabel: { color: Surface.muted, fontSize: 14 },
   metricRow: {
     alignItems: 'center',
-    borderBottomColor: '#e3e9e8',
+    borderBottomColor: Surface.border,
     borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -134,11 +135,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   metricRowLast: { borderBottomWidth: 0 },
-  metricValue: { color: '#171d1c', fontSize: 15, fontWeight: '700' },
-  note: { color: '#6c7a78', fontSize: 13, lineHeight: 20, paddingHorizontal: 4, textAlign: 'center' },
+  metricValue: { color: Surface.ink, fontSize: 15, fontWeight: '700' },
+  note: { color: Surface.muted, fontSize: 13, lineHeight: 20, paddingHorizontal: 4, textAlign: 'center' },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: '#20B2AA',
+    backgroundColor: Brand.primary,
     borderRadius: 14,
     flexDirection: 'row',
     gap: 8,
@@ -149,7 +150,7 @@ const styles = StyleSheet.create({
   primaryButtonText: { color: '#ffffff', fontSize: 16, fontWeight: '700' },
   secondaryButton: {
     alignItems: 'center',
-    backgroundColor: '#f5fbf9',
+    backgroundColor: Surface.bgSoft,
     borderColor: '#d5e4e2',
     borderRadius: 14,
     borderWidth: 1,
@@ -159,5 +160,5 @@ const styles = StyleSheet.create({
     minHeight: 48,
     paddingHorizontal: 16,
   },
-  secondaryButtonText: { color: '#20B2AA', fontSize: 15, fontWeight: '700' },
+  secondaryButtonText: { color: Brand.primary, fontSize: 15, fontWeight: '700' },
 });

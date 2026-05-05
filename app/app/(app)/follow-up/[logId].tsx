@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { LogDetailContent } from '@/components/log-detail-content';
 import { usePoopLog } from '@/hooks/use-poop-logs';
+import { Surface } from '@/constants/theme';
 
 export default function FollowUpScreen() {
   const { logId } = useLocalSearchParams<{ logId?: string }>();
@@ -45,6 +46,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 32,
   },
-  errorText: { color: '#171d1c', fontSize: 17, fontWeight: '700' },
-  errorSubtext: { color: '#6c7a78', fontSize: 14, lineHeight: 20, textAlign: 'center' },
+  errorText: { color: Surface.ink, fontSize: 17, fontWeight: '700' },
+  errorSubtext: { color: Surface.muted, fontSize: 14, lineHeight: 20, textAlign: 'center' },
 });

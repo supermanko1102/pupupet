@@ -1,17 +1,10 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
-import * as Crypto from 'expo-crypto';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Fonts } from '@/constants/theme';
-import { supabase } from '@/lib/supabase';
-
-function createRawNonce(byteLength = 32) {
-  return Array.from(Crypto.getRandomBytes(byteLength))
-    .map((value) => value.toString(16).padStart(2, '0'))
-    .join('');
-}
+import { AppleSignInCanceledError, signInWithApple } from '@/lib/auth';
+import { Fonts, Surface } from '@/constants/theme';
 
 export function AppleSignInCard() {
   const [isAvailable, setIsAvailable] = useState<boolean | null>(Platform.OS === 'ios' ? null : false);
@@ -28,56 +21,13 @@ export function AppleSignInCard() {
       .catch(() => setIsAvailable(false));
   }, []);
 
-  async function signInWithApple() {
-    if (!supabase) {
-      setMessage('Supabase 尚未設定完成。');
-      return;
-    }
-
+  async function handleSignIn() {
     try {
       setIsLoading(true);
       setMessage(null);
-
-      const rawNonce = createRawNonce();
-      const hashedNonce = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, rawNonce);
-
-      const credential = await AppleAuthentication.signInAsync({
-        nonce: hashedNonce,
-        requestedScopes: [
-          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-          AppleAuthentication.AppleAuthenticationScope.EMAIL,
-        ],
-      });
-
-      if (!credential.identityToken) {
-        throw new Error('Apple 沒有回傳 identity token。');
-      }
-
-      const { error } = await supabase.auth.signInWithIdToken({
-        provider: 'apple',
-        token: credential.identityToken,
-        nonce: rawNonce,
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      if (credential.fullName?.givenName || credential.fullName?.familyName) {
-        const fullName = [credential.fullName.givenName, credential.fullName.familyName]
-          .filter(Boolean)
-          .join(' ');
-
-        await supabase.auth.updateUser({
-          data: {
-            family_name: credential.fullName.familyName,
-            full_name: fullName,
-            given_name: credential.fullName.givenName,
-          },
-        });
-      }
+      await signInWithApple();
     } catch (error) {
-      if (error instanceof Error && 'code' in error && error.code === 'ERR_REQUEST_CANCELED') {
+      if (error instanceof AppleSignInCanceledError) {
         setMessage('你已取消 Apple 登入。');
       } else {
         setMessage(error instanceof Error ? error.message : 'Apple 登入失敗。');
@@ -100,7 +50,7 @@ export function AppleSignInCard() {
           (pressed || isLoading) && canUseApple ? styles.buttonPressed : null,
           !canUseApple ? styles.buttonDisabled : null,
         ]}
-        onPress={() => void signInWithApple()}>
+        onPress={() => void handleSignIn()}>
         <MaterialCommunityIcons color="#171D1D" name="apple" size={24} />
         <Text style={styles.buttonText}>
           {showCheckingState ? 'Checking Apple Sign In' : 'Continue with Apple'}
@@ -157,7 +107,7 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.97 }],
   },
   buttonText: {
-    color: '#171D1D',
+    color: Surface.ink,
     fontFamily: Fonts.sans,
     fontSize: 18,
     fontWeight: '700',

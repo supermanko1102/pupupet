@@ -3,9 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   pollAnalysisOnce,
   type AnalysisPollerDeps,
-} from '@/lib/analysis-poller';
-import type { PolledAnalysisLog } from '@/lib/photo-analysis-result';
-import { PollingController } from '@/lib/polling-controller';
+} from '@/lib/logs/analysis-poller';
+import type { PolledAnalysisLog } from '@/lib/photos/photo-analysis-result';
+import { PollingController } from '@/lib/logs/polling-controller';
 
 function makeDeps(overrides: Partial<AnalysisPollerDeps> = {}): AnalysisPollerDeps {
   return {

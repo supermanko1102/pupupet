@@ -17,6 +17,7 @@ import { settingsRouteStyles as shared } from '@/components/settings/route-share
 import { useCreatePet, useDeletePet, usePets, useUpdatePet } from '@/hooks/use-pets';
 import { petSpeciesEmoji } from '@/lib/pet-display';
 import type { Database } from '@/types/database';
+import { Brand, Surface } from '@/constants/theme';
 
 type Pet = Database['public']['Tables']['pets']['Row'];
 type Species = Pet['species'];
@@ -226,16 +227,16 @@ export default function PetEditorScreen() {
 
 const styles = StyleSheet.create({
   centered: { alignItems: 'center', flex: 1, justifyContent: 'center' },
-  errorTitle: { color: '#171d1c', fontSize: 17, fontWeight: '700', marginTop: 4 },
+  errorTitle: { color: Surface.ink, fontSize: 17, fontWeight: '700', marginTop: 4 },
   errorSubtitle: {
-    color: '#6c7a78',
+    color: Surface.muted,
     fontSize: 14,
     lineHeight: 20,
     marginTop: 4,
     textAlign: 'center',
   },
   field: { gap: 8, paddingHorizontal: 16, paddingVertical: 14 },
-  fieldLabel: { color: '#3c4948', fontSize: 14, fontWeight: '600' },
+  fieldLabel: { color: Surface.inkSoft, fontSize: 14, fontWeight: '600' },
   speciesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   speciesButton: {
     backgroundColor: '#ffffff',
@@ -245,23 +246,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
-  speciesButtonActive: { backgroundColor: '#f0fdf9', borderColor: '#20B2AA' },
-  speciesButtonText: { color: '#3c4948', fontSize: 14, fontWeight: '600' },
+  speciesButtonActive: { backgroundColor: '#f0fdf9', borderColor: Brand.primary },
+  speciesButtonText: { color: Surface.inkSoft, fontSize: 14, fontWeight: '600' },
   speciesButtonTextActive: { color: '#006a65' },
-  divider: { backgroundColor: '#e3e9e8', height: StyleSheet.hairlineWidth, marginHorizontal: 16 },
+  divider: { backgroundColor: Surface.border, height: StyleSheet.hairlineWidth, marginHorizontal: 16 },
   input: {
     backgroundColor: '#ffffff',
     borderColor: '#d9e3e1',
     borderRadius: 12,
     borderWidth: 1,
-    color: '#171d1c',
+    color: Surface.ink,
     fontSize: 15,
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: '#20B2AA',
+    backgroundColor: Brand.primary,
     borderRadius: 14,
     height: 52,
     justifyContent: 'center',
@@ -279,12 +280,12 @@ const styles = StyleSheet.create({
   deleteButtonText: { color: '#9a3412', fontSize: 16, fontWeight: '600' },
   secondaryButton: {
     alignItems: 'center',
-    backgroundColor: '#e9efed',
+    backgroundColor: Surface.bgMuted,
     borderRadius: 14,
     justifyContent: 'center',
     marginTop: 18,
     minHeight: 48,
     paddingHorizontal: 18,
   },
-  secondaryButtonText: { color: '#3c4948', fontSize: 15, fontWeight: '700' },
+  secondaryButtonText: { color: Surface.inkSoft, fontSize: 15, fontWeight: '700' },
 });

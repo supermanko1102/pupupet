@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Brand, Surface } from '@/constants/theme';
 
 export type Screen = 'menu' | 'pets' | 'account' | 'terms' | 'privacy' | 'disclaimer';
 
@@ -60,8 +61,8 @@ export const shared = StyleSheet.create({
   scroll: { flex: 1 },
   content: { padding: 20, paddingBottom: 40, gap: 12 },
   section: {
-    backgroundColor: '#f5fbf9',
-    borderColor: '#e3e9e8',
+    backgroundColor: Surface.bgSoft,
+    borderColor: Surface.border,
     borderRadius: 16,
     borderWidth: 1,
     overflow: 'hidden',
@@ -71,7 +72,7 @@ export const shared = StyleSheet.create({
 const s = StyleSheet.create({
   subHeader: {
     alignItems: 'center',
-    borderBottomColor: '#e3e9e8',
+    borderBottomColor: Surface.border,
     borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -86,18 +87,18 @@ const s = StyleSheet.create({
     paddingHorizontal: 8,
   },
   backText: {
-    color: '#20B2AA',
+    color: Brand.primary,
     fontSize: 16,
   },
   subTitle: {
-    color: '#171d1c',
+    color: Surface.ink,
     fontSize: 16,
     fontWeight: '700',
   },
   menuItem: {
     alignItems: 'center',
-    backgroundColor: '#f5fbf9',
-    borderBottomColor: '#e3e9e8',
+    backgroundColor: Surface.bgSoft,
+    borderBottomColor: Surface.border,
     borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -117,14 +118,14 @@ const s = StyleSheet.create({
   },
   menuIconWrap: {
     alignItems: 'center',
-    backgroundColor: '#20B2AA',
+    backgroundColor: Brand.primary,
     borderRadius: 8,
     height: 32,
     justifyContent: 'center',
     width: 32,
   },
   menuItemLabel: {
-    color: '#171d1c',
+    color: Surface.ink,
     fontSize: 16,
   },
 });

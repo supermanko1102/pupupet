@@ -1,7 +1,7 @@
 import type { ImagePickerAsset } from 'expo-image-picker';
 
 import { supabase } from '@/lib/supabase';
-import { getUploadFileExtension } from '@/lib/upload-path';
+import { getUploadFileExtension } from '@/lib/photos/upload-path';
 
 export async function uploadPoopPhoto(userId: string, asset: ImagePickerAsset) {
   if (!supabase) {

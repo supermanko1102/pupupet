@@ -3,6 +3,7 @@ import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { cancelFollowUp } from '@/lib/notifications';
 import type { RecentLog } from '@/hooks/use-poop-logs';
+import { Brand, Surface } from '@/constants/theme';
 
 type Props = {
   recentLogs: RecentLog[];
@@ -44,7 +45,7 @@ export function NotificationDebugPanel({ recentLogs, onOpenFollowUp }: Props) {
         <Text style={styles.btnText}>直接開 Follow-up Modal</Text>
       </Pressable>
       <Pressable style={[styles.btn, styles.btnSecondary]} onPress={() => void scheduleIn5Seconds()}>
-        <Text style={[styles.btnText, { color: '#3c4948' }]}>排一個 5 秒後的通知</Text>
+        <Text style={[styles.btnText, { color: Surface.inkSoft }]}>排一個 5 秒後的通知</Text>
       </Pressable>
     </View>
   );
@@ -66,10 +67,10 @@ const styles = StyleSheet.create({
   target: { color: '#92400e', fontSize: 12 },
   btn: {
     alignItems: 'center',
-    backgroundColor: '#20B2AA',
+    backgroundColor: Brand.primary,
     borderRadius: 10,
     paddingVertical: 10,
   },
-  btnSecondary: { backgroundColor: '#e9efed' },
+  btnSecondary: { backgroundColor: Surface.bgMuted },
   btnText: { color: '#ffffff', fontSize: 14, fontWeight: '600' },
 });

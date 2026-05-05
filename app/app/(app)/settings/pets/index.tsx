@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { settingsRouteStyles as shared } from '@/components/settings/route-shared';
 import { usePets } from '@/hooks/use-pets';
 import type { Database } from '@/types/database';
+import { Brand, Surface } from '@/constants/theme';
 
 type Pet = Database['public']['Tables']['pets']['Row'];
 type Species = Pet['species'];
@@ -68,7 +69,7 @@ export default function SettingsPetsScreen() {
 const styles = StyleSheet.create({
   petRow: {
     alignItems: 'center',
-    borderBottomColor: '#e3e9e8',
+    borderBottomColor: Surface.border,
     borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -79,12 +80,12 @@ const styles = StyleSheet.create({
   petRowPressed: { backgroundColor: '#eef6f4' },
   petRowLeft: { alignItems: 'center', flexDirection: 'row', gap: 12 },
   petEmoji: { fontSize: 24 },
-  petName: { color: '#171d1c', fontSize: 15, fontWeight: '600' },
-  petMeta: { color: '#6c7a78', fontSize: 13, marginTop: 2 },
-  emptyHint: { color: '#6c7a78', fontSize: 14, lineHeight: 20, textAlign: 'center' },
+  petName: { color: Surface.ink, fontSize: 15, fontWeight: '600' },
+  petMeta: { color: Surface.muted, fontSize: 13, marginTop: 2 },
+  emptyHint: { color: Surface.muted, fontSize: 14, lineHeight: 20, textAlign: 'center' },
   addButton: {
     alignItems: 'center',
-    backgroundColor: '#20B2AA',
+    backgroundColor: Brand.primary,
     borderRadius: 14,
     flexDirection: 'row',
     gap: 8,

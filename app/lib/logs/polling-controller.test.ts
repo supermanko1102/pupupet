@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { PollingController } from '@/lib/polling-controller';
+import { PollingController } from '@/lib/logs/polling-controller';
 
 describe('PollingController', () => {
   it('tracks timeout from the start time', () => {

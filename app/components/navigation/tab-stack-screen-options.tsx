@@ -1,6 +1,7 @@
 import type { NativeStackNavigationOptions } from '@react-navigation/native-stack';
 
 import { MenuHeaderButton, NotificationsHeaderButton } from '@/components/tab-header-buttons';
+import { Surface } from '@/constants/theme';
 
 export const tabStackScreenOptions: NativeStackNavigationOptions = {
   contentStyle: { backgroundColor: '#ffffff' },
@@ -10,7 +11,7 @@ export const tabStackScreenOptions: NativeStackNavigationOptions = {
   headerShadowVisible: false,
   headerStyle: { backgroundColor: '#ffffff' },
   headerTitleStyle: {
-    color: '#171d1c',
+    color: Surface.ink,
     fontSize: 18,
     fontWeight: '700',
   },

@@ -1,9 +1,9 @@
 import type { AnalysisResult } from '@/components/photo-analysis-modal';
-import { PollingController } from '@/lib/polling-controller';
+import { PollingController } from '@/lib/logs/polling-controller';
 import {
   createCompletedAnalysisResult,
   type PolledAnalysisLog,
-} from '@/lib/photo-analysis-result';
+} from '@/lib/photos/photo-analysis-result';
 
 export type AnalysisPollerDeps = {
   fetchLogStatus: (logId: string) => Promise<{

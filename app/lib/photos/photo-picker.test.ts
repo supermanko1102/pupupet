@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { PHOTO_PICKER_OPTIONS, firstPickedAsset } from '@/lib/photo-picker';
+import { PHOTO_PICKER_OPTIONS, firstPickedAsset } from '@/lib/photos/photo-picker';
 
 describe('photo picker helpers', () => {
   it('keeps a single shared picker configuration', () => {

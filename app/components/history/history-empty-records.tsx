@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { Surface } from '@/constants/theme';
 
 export function HistoryEmptyRecords({
   abnormalOnly,
@@ -40,6 +41,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
     paddingTop: 48,
   },
-  emptyTitle: { color: '#171d1c', fontSize: 17, fontWeight: '700' },
-  emptySubtitle: { color: '#6c7a78', fontSize: 14, lineHeight: 20, textAlign: 'center' },
+  emptyTitle: { color: Surface.ink, fontSize: 17, fontWeight: '700' },
+  emptySubtitle: { color: Surface.muted, fontSize: 14, lineHeight: 20, textAlign: 'center' },
 });

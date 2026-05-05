@@ -14,10 +14,10 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { modalStyles as ms } from '@/components/modal-styles';
 import { PetPicker } from '@/components/pet-picker';
-import { Ripple } from '@/constants/theme';
 import { lightImpactFeedback, selectionFeedback } from '@/lib/haptics';
-import { riskBannerStyle, riskIcon, riskTitle } from '@/lib/log-utils';
+import { riskBannerStyle, riskIcon, riskTitle } from '@/lib/logs/log-utils';
 import type { Database } from '@/types/database';
+import { Ripple, Surface } from '@/constants/theme';
 
 type RiskLevel = Database['public']['Tables']['poop_logs']['Row']['risk_level'];
 type Pet = Database['public']['Tables']['pets']['Row'];
@@ -162,17 +162,17 @@ const styles = StyleSheet.create({
     alignItems: 'center', bottom: 0, gap: 12, justifyContent: 'center',
     left: 0, position: 'absolute', right: 0, top: 0,
   },
-  analyzingTitle:    { color: '#171d1c', fontSize: 22, fontWeight: '700' },
-  analyzingSubtitle: { color: '#6c7a78', fontSize: 15 },
+  analyzingTitle:    { color: Surface.ink, fontSize: 22, fontWeight: '700' },
+  analyzingSubtitle: { color: Surface.muted, fontSize: 15 },
 
   petPickerSection: {
-    borderTopColor: '#e3e9e8', borderTopWidth: StyleSheet.hairlineWidth, gap: 12, paddingTop: 16,
+    borderTopColor: Surface.border, borderTopWidth: StyleSheet.hairlineWidth, gap: 12, paddingTop: 16,
   },
   petPickerTitle: {
-    color: '#6c7a78', fontSize: 13, fontWeight: '600', letterSpacing: 0.4, textTransform: 'uppercase',
+    color: Surface.muted, fontSize: 13, fontWeight: '600', letterSpacing: 0.4, textTransform: 'uppercase',
   },
   petPickerSkipButton: { borderRadius: 999, overflow: 'hidden', paddingVertical: 8 },
-  petPickerSkip:  { color: '#bbc9c7', fontSize: 14, textAlign: 'center' },
+  petPickerSkip:  { color: Surface.hairline, fontSize: 14, textAlign: 'center' },
   petPickerDone:  { color: '#16a34a', fontSize: 14, fontWeight: '600', textAlign: 'center' },
   modalButton:    { overflow: 'hidden' },
   buttonPressed:  { opacity: 0.72 },

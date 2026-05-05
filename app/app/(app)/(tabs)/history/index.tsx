@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { HistoryEmptyRecords } from '@/components/history/history-empty-records';
-import { HistoryHeader } from '@/components/history/history-header';
+import { HistoryHeader } from '@/components/history/header';
 import { HistoryLogCard } from '@/components/history/history-log-card';
 import {
   buildCurrentMonthDays,
@@ -23,13 +23,14 @@ import {
   RANGE_OPTIONS,
   type DayMetric,
   type RangeKey,
-} from '@/lib/history-metrics';
+} from '@/lib/logs/history-metrics';
 import {
   useHistoryLogs,
   useHistoryLogsForDate,
   useStats,
   useTrendSummary,
 } from '@/hooks/use-poop-logs';
+import { Surface } from '@/constants/theme';
 
 export default function HistoryScreen() {
   const [rangeKey, setRangeKey] = useState<RangeKey>('7d');
@@ -191,7 +192,7 @@ const styles = StyleSheet.create({
   screen: { backgroundColor: '#ffffff', flex: 1 },
   contentArea: { flex: 1, overflow: 'hidden' },
   centered: { alignItems: 'center', flex: 1, gap: 12, justifyContent: 'center' },
-  errorText: { color: '#6c7a78', fontSize: 15, textAlign: 'center' },
+  errorText: { color: Surface.muted, fontSize: 15, textAlign: 'center' },
   listContent: { paddingBottom: 32, paddingTop: 8 },
   sectionHeader: {
     backgroundColor: '#ffffff',
@@ -200,7 +201,7 @@ const styles = StyleSheet.create({
     paddingTop: 18,
   },
   sectionHeaderText: {
-    color: '#6c7a78',
+    color: Surface.muted,
     fontSize: 13,
     fontWeight: '700',
   },

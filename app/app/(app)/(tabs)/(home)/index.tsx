@@ -14,14 +14,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { NotificationDebugPanel } from '@/components/dev/notification-debug-panel';
 import { LogDetailModal } from '@/components/log-detail-content';
 import { PhotoAnalysisModal } from '@/components/photo-analysis-modal';
-import { Ripple } from '@/constants/theme';
 import { useLogDetailFlow } from '@/hooks/use-log-detail-flow';
 import { usePets } from '@/hooks/use-pets';
 import { usePhotoAnalysisFlow } from '@/hooks/use-photo-analysis-flow';
 import { useRecentLogs, useTrendSummary } from '@/hooks/use-poop-logs';
-import { logStatusLabel } from '@/lib/log-utils';
+import { logStatusLabel } from '@/lib/logs/log-utils';
 import { lightImpactFeedback } from '@/lib/haptics';
 import { useSession } from '@/providers/session-provider';
+import { Brand, Ripple, Surface } from '@/constants/theme';
 
 // ─── Home Screen ──────────────────────────────────────────────────────────────
 
@@ -188,8 +188,8 @@ const styles = StyleSheet.create({
 
   // Hero
   heroSection: { alignItems: 'center', paddingHorizontal: 32, gap: 6, marginBottom: 28 },
-  heroTitle: { color: '#171d1c', fontSize: 26, fontWeight: '700', textAlign: 'center', letterSpacing: -0.5 },
-  heroSubtitle: { color: '#6c7a78', fontSize: 15, textAlign: 'center' },
+  heroTitle: { color: Surface.ink, fontSize: 26, fontWeight: '700', textAlign: 'center', letterSpacing: -0.5 },
+  heroSubtitle: { color: Surface.muted, fontSize: 15, textAlign: 'center' },
 
   // Primary action
   ctaRow: { paddingHorizontal: 20, width: '100%', marginBottom: 12 },
@@ -201,8 +201,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   ctaCardPrimary: {
-    backgroundColor: '#20B2AA',
-    shadowColor: '#20B2AA',
+    backgroundColor: Brand.primary,
+    shadowColor: Brand.primary,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
     shadowRadius: 14,
@@ -230,13 +230,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
-  libraryButtonText: { color: '#6c7a78', fontSize: 14, fontWeight: '500' },
+  libraryButtonText: { color: Surface.muted, fontSize: 14, fontWeight: '500' },
 
   summarySection: { gap: 10, paddingHorizontal: 20, width: '100%' },
-  summarySectionTitle: { color: '#171d1c', fontSize: 17, fontWeight: '700' },
+  summarySectionTitle: { color: Surface.ink, fontSize: 17, fontWeight: '700' },
   summaryCard: {
-    backgroundColor: '#f5fbf9',
-    borderColor: '#e3e9e8',
+    backgroundColor: Surface.bgSoft,
+    borderColor: Surface.border,
     borderRadius: 20,
     borderWidth: 1,
     gap: 14,
@@ -252,8 +252,8 @@ const styles = StyleSheet.create({
     width: 44,
   },
   summaryBody: { flex: 1, gap: 4 },
-  summaryTitle: { color: '#171d1c', fontSize: 16, fontWeight: '700', lineHeight: 22 },
-  summarySubtitle: { color: '#6c7a78', fontSize: 13, lineHeight: 19 },
+  summaryTitle: { color: Surface.ink, fontSize: 16, fontWeight: '700', lineHeight: 22 },
+  summarySubtitle: { color: Surface.muted, fontSize: 13, lineHeight: 19 },
   summaryActionRow: { flexDirection: 'row', gap: 10 },
   summaryActionButton: {
     alignItems: 'center',
@@ -264,10 +264,10 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     paddingHorizontal: 14,
   },
-  summaryActionPrimary: { backgroundColor: '#20B2AA' },
+  summaryActionPrimary: { backgroundColor: Brand.primary },
   summaryActionPrimaryText: { color: '#ffffff', fontSize: 15, fontWeight: '700' },
   buttonPressed: { opacity: 0.72 },
   emptyState: { alignItems: 'center', gap: 12, marginTop: 24, paddingHorizontal: 40 },
-  emptyText: { color: '#6c7a78', fontSize: 15, lineHeight: 22, textAlign: 'center' },
+  emptyText: { color: Surface.muted, fontSize: 15, lineHeight: 22, textAlign: 'center' },
 
 });

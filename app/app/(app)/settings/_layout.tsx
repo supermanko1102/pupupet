@@ -1,4 +1,5 @@
 import { Stack } from 'expo-router';
+import { Brand, Surface } from '@/constants/theme';
 
 export default function SettingsLayout() {
   return (
@@ -6,9 +7,9 @@ export default function SettingsLayout() {
       screenOptions={{
         headerBackButtonDisplayMode: 'minimal',
         headerShadowVisible: false,
-        headerTintColor: '#20B2AA',
+        headerTintColor: Brand.primary,
         headerTitleStyle: {
-          color: '#171d1c',
+          color: Surface.ink,
           fontWeight: '700',
         },
         headerStyle: {

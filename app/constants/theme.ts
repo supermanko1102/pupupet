@@ -34,6 +34,23 @@ export const Brand = {
   secondary: '#93a4a1',
 } as const;
 
+// ─── Surface tokens ──────────────────────────────────────────────────────────
+// Neutral text/background palette used across screens.
+// ink/muted are for text, bg* for surfaces, border/divider/hairline for lines.
+export const Surface = {
+  ink: '#171d1c',
+  inkSoft: '#3c4948',
+  muted: '#6c7a78',
+  mutedSoft: '#93a4a1',
+  hairline: '#bbc9c7',
+  border: '#e3e9e8',
+  divider: '#edf3f2',
+  bg: '#ffffff',
+  bgSoft: '#f5fbf9',
+  bgSubtle: '#eef5f3',
+  bgMuted: '#e9efed',
+} as const;
+
 // ─── Pressable tokens ────────────────────────────────────────────────────────
 // Android ripple colors used by Pressable across the app.
 export const Ripple = {

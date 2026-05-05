@@ -10,14 +10,15 @@ import {
 } from 'react-native';
 
 import { poopLogsKeys, useStats } from '@/hooks/use-poop-logs';
-import { buildRecentDays, type DayMetric } from '@/lib/history-metrics';
+import { buildRecentDays, type DayMetric } from '@/lib/logs/history-metrics';
 import { useSession } from '@/providers/session-provider';
+import { Brand, Surface } from '@/constants/theme';
 
 function DayDot({ day }: { day: DayMetric }) {
   const color =
-    day.riskLevel === 'normal' ? '#20B2AA' :
+    day.riskLevel === 'normal' ? Brand.primary :
     day.riskLevel === 'observe' ? '#f59e0b' :
-    day.riskLevel === 'vet' ? '#ef4444' : '#e3e9e8';
+    day.riskLevel === 'vet' ? '#ef4444' : Surface.border;
 
   return (
     <View style={styles.dayItem}>
@@ -101,7 +102,7 @@ export function StatsPanel() {
         </View>
         <View style={styles.legend}>
           <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: '#20B2AA' }]} />
+            <View style={[styles.legendDot, { backgroundColor: Brand.primary }]} />
             <Text style={styles.legendText}>正常</Text>
           </View>
           <View style={styles.legendItem}>
@@ -113,7 +114,7 @@ export function StatsPanel() {
             <Text style={styles.legendText}>就醫</Text>
           </View>
           <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: '#e3e9e8' }]} />
+            <View style={[styles.legendDot, { backgroundColor: Surface.border }]} />
             <Text style={styles.legendText}>無紀錄</Text>
           </View>
         </View>
@@ -142,21 +143,21 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   pageTitle: {
-    color: '#171d1c',
+    color: Surface.ink,
     fontSize: 28,
     fontWeight: '800',
     letterSpacing: -0.5,
   },
   section: {
-    backgroundColor: '#f5fbf9',
-    borderColor: '#e3e9e8',
+    backgroundColor: Surface.bgSoft,
+    borderColor: Surface.border,
     borderRadius: 20,
     borderWidth: 1,
     gap: 16,
     padding: 20,
   },
   sectionTitle: {
-    color: '#6c7a78',
+    color: Surface.muted,
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: 0.8,
@@ -182,7 +183,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   cardLabel: {
-    color: '#6c7a78',
+    color: Surface.muted,
     fontSize: 11,
     fontWeight: '600',
   },
@@ -192,11 +193,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   rateLabel: {
-    color: '#6c7a78',
+    color: Surface.muted,
     fontSize: 14,
   },
   rateValue: {
-    color: '#20B2AA',
+    color: Brand.primary,
     fontSize: 20,
     fontWeight: '800',
   },
@@ -216,15 +217,15 @@ const styles = StyleSheet.create({
     width: 28,
   },
   dayDotToday: {
-    borderColor: '#171d1c',
+    borderColor: Surface.ink,
     borderWidth: 2,
   },
   dayLabel: {
-    color: '#6c7a78',
+    color: Surface.muted,
     fontSize: 11,
   },
   dayLabelToday: {
-    color: '#171d1c',
+    color: Surface.ink,
     fontWeight: '700',
   },
 
@@ -245,12 +246,12 @@ const styles = StyleSheet.create({
     width: 10,
   },
   legendText: {
-    color: '#6c7a78',
+    color: Surface.muted,
     fontSize: 12,
   },
 
   emptyHint: {
-    color: '#bbc9c7',
+    color: Surface.hairline,
     fontSize: 14,
     lineHeight: 20,
     textAlign: 'center',

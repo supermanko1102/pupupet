@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { StatusColors } from '@/constants/theme';
-import type { LogTone } from '@/lib/log-utils';
+import type { LogTone } from '@/lib/logs/log-utils';
 
 const TONE_COLORS: Record<LogTone, { bg: string; text: string }> = {
   danger:  { bg: StatusColors.vet.bg,     text: StatusColors.vet.text },
