@@ -86,7 +86,7 @@ export type HistoryLog = {
 
 export type RecentLog = HistoryLog;
 
-export type HistoryRow = {
+type HistoryRow = {
   bristol_score: number | null;
   captured_at: string;
   id: string;

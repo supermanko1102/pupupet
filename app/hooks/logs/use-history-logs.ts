@@ -5,8 +5,6 @@ import { useSession } from '@/providers/session-provider';
 import { fetchHistoryLogs, fetchHistoryLogsForDate, HISTORY_PAGE_SIZE, poopLogsKeys } from './shared';
 import type { HistoryLog } from './shared';
 
-export type { HistoryLog };
-
 export function useHistoryLogs() {
   const { user } = useSession();
 

@@ -13,7 +13,7 @@ export type AnalysisPollerDeps = {
   createSignedUrl: (imagePath: string) => Promise<string | null>;
 };
 
-export type PollOutcome =
+type PollOutcome =
   /** request still in-flight or status not yet terminal — keep polling */
   | { kind: 'pending' }
   /** previous request hasn't finished yet — skip this tick */
@@ -25,7 +25,7 @@ export type PollOutcome =
   /** log status reached `done` or `failed`; analysis result is ready */
   | { kind: 'completed'; result: AnalysisResult; logId: string };
 
-export type PollAnalysisArgs = {
+type PollAnalysisArgs = {
   controller: PollingController<unknown>;
   deps: AnalysisPollerDeps;
   imagePath: string;

@@ -1,4 +1,4 @@
-export type UploadAssetFileInfo = {
+type UploadAssetFileInfo = {
   fileName?: string | null;
   mimeType?: string | null;
 };

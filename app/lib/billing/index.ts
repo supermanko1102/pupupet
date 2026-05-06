@@ -29,7 +29,7 @@ export function remainingAnalysesFor(account: BillingAccount | null) {
   return account.free_analysis_remaining;
 }
 
-export type AnalysisAccess =
+type AnalysisAccess =
   | { kind: 'ok' }
   | { kind: 'monthly_exhausted' }    // 訂閱者本月用完
   | { kind: 'free_exhausted' };      // 免費額度用完，需要訂閱

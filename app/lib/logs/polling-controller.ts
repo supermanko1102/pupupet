@@ -1,4 +1,4 @@
-export type PollingControllerOptions = {
+type PollingControllerOptions = {
   maxErrors: number;
   timeoutMs: number;
 };

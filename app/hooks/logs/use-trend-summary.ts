@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { useSession } from '@/providers/session-provider';
 import { fetchDoneLogSignals, poopLogsKeys } from './shared';
 
-export type TrendSummary = {
+type TrendSummary = {
   message: string;
   recentCount: number;
   hasRecentAbnormal: boolean;

@@ -2,8 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Brand, Surface } from '@/constants/theme';
 
-export type Screen = 'menu' | 'pets' | 'account' | 'terms' | 'privacy' | 'disclaimer';
-
 // ─── MenuItem ─────────────────────────────────────────────────────────────────
 
 export function MenuItem({
@@ -49,31 +47,6 @@ export const shared = StyleSheet.create({
 /* eslint-enable react-native/no-unused-styles */
 
 const s = StyleSheet.create({
-  subHeader: {
-    alignItems: 'center',
-    borderBottomColor: Surface.border,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 8,
-    paddingVertical: 12,
-  },
-  backButton: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 2,
-    minWidth: 80,
-    paddingHorizontal: 8,
-  },
-  backText: {
-    color: Brand.primary,
-    fontSize: 16,
-  },
-  subTitle: {
-    color: Surface.ink,
-    fontSize: 16,
-    fontWeight: '700',
-  },
   menuItem: {
     alignItems: 'center',
     backgroundColor: Surface.bgSoft,

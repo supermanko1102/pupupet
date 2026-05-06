@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 
-export type CreatedAnalysisLog = {
+type CreatedAnalysisLog = {
   current_period_end: string | null;
   free_analysis_remaining: number;
   image_path: string;

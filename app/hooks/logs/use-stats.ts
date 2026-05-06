@@ -5,7 +5,7 @@ import { useSession } from '@/providers/session-provider';
 import { fetchDoneLogSignals, poopLogsKeys } from './shared';
 import type { LogSignal } from './shared';
 
-export type StatsData = {
+type StatsData = {
   total: number;
   normal: number;
   observe: number;

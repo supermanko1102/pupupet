@@ -1,11 +1,11 @@
 export type LegalPageKey = 'terms' | 'privacy' | 'disclaimer';
 
-export type LegalSection = {
+type LegalSection = {
   heading: string;
   body: string;
 };
 
-export type LegalPage = {
+type LegalPage = {
   title: string;
   meta: string;
   alertBox?: string;

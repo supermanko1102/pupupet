@@ -3,7 +3,7 @@ import type { HistoryLog, LogSignal, RiskLevel } from '@/hooks/use-poop-logs';
 
 export type RangeKey = '7d' | '30d';
 
-export type Section = {
+type Section = {
   data: HistoryLog[];
   title: string;
 };

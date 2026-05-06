@@ -11,7 +11,5 @@ export { useHistoryLogs, useHistoryLogsForDate } from './logs/use-history-logs';
 export { usePoopLog } from './logs/use-poop-log';
 
 export { useStats } from './logs/use-stats';
-export type { StatsData } from './logs/use-stats';
 
 export { useTrendSummary } from './logs/use-trend-summary';
-export type { TrendSummary } from './logs/use-trend-summary';
