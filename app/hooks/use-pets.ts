@@ -9,7 +9,7 @@ type Pet = Database['public']['Tables']['pets']['Row'];
 type PetInsert = Database['public']['Tables']['pets']['Insert'];
 type PetUpdate = Database['public']['Tables']['pets']['Update'];
 
-export const PETS_KEY = 'pets';
+const PETS_KEY = 'pets';
 
 export function usePets() {
   const { user } = useSession();

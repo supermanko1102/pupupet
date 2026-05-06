@@ -1,7 +1,6 @@
 // Re-export everything from the split hooks/logs/ modules.
 // All existing imports of '@/hooks/use-poop-logs' continue to work unchanged.
 
-export { poopLogsKeys, POOP_LOGS_KEY, HISTORY_PAGE_SIZE } from './logs/shared';
 export type { HistoryLog, LogSignal, RiskLevel } from './logs/shared';
 
 export { useRecentLogs } from './logs/use-recent-logs';

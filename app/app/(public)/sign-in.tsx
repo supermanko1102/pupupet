@@ -1,10 +1,11 @@
 import { Redirect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppleSignInCard } from '@/components/apple-sign-in-card';
+import { Fonts } from '@/constants/theme';
 import { useSession } from '@/providers/session-provider';
 
 export default function SignInScreen() {
@@ -28,6 +29,10 @@ export default function SignInScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}>
           <View style={styles.content}>
+            <View style={styles.logoGroup}>
+              <Text style={styles.brand}>PupuPet</Text>
+              <Text style={styles.brandCn}>口袋便便</Text>
+            </View>
             <AppleSignInCard />
           </View>
         </ScrollView>
@@ -37,9 +42,32 @@ export default function SignInScreen() {
 }
 
 const styles = StyleSheet.create({
+  brand: {
+    color: '#20B2AA',
+    fontFamily: Fonts.rounded,
+    fontSize: 40,
+    fontWeight: '800',
+    letterSpacing: -1,
+    lineHeight: 44,
+    textAlign: 'center',
+  },
+  brandCn: {
+    color: 'rgba(60, 73, 72, 0.6)',
+    fontFamily: Fonts.sans,
+    fontSize: 18,
+    fontWeight: '500',
+    letterSpacing: 4.8,
+    lineHeight: 24,
+    marginTop: 4,
+    textAlign: 'center',
+  },
   content: {
     alignItems: 'center',
     width: '100%',
+  },
+  logoGroup: {
+    alignItems: 'center',
+    marginBottom: 48,
   },
   safeArea: {
     flex: 1,

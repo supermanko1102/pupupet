@@ -20,7 +20,7 @@ function isPermissionGranted(result: Notifications.NotificationPermissionsStatus
 
 // 請求通知權限，並取得 Expo Push Token（真機才能取得）
 // 回傳 granted 和 token（模擬器 token 為 null）
-export async function registerForPushNotifications(): Promise<{ granted: boolean; token: string | null }> {
+async function registerForPushNotifications(): Promise<{ granted: boolean; token: string | null }> {
   const existing = await Notifications.getPermissionsAsync();
 
   if (!isPermissionGranted(existing)) {

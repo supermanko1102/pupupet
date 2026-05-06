@@ -9,7 +9,6 @@ import { canUseRevenueCatPurchases, configurePurchasesForUser, logRevenueCatProd
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/providers/session-provider';
 
-const PLUS_ENTITLEMENT_ID = 'plus';
 const BILLING_KEY = 'billing_account';
 
 type BillingContextValue = {
@@ -227,4 +226,4 @@ export function useBilling() {
   return useContext(BillingContext);
 }
 
-export { BILLING_KEY, PLUS_ENTITLEMENT_ID };
+export { BILLING_KEY };

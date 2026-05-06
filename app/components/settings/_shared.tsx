@@ -4,29 +4,6 @@ import { Brand, Surface } from '@/constants/theme';
 
 export type Screen = 'menu' | 'pets' | 'account' | 'terms' | 'privacy' | 'disclaimer';
 
-// ─── SubHeader ────────────────────────────────────────────────────────────────
-
-export function SubHeader({
-  title,
-  onBack,
-  backLabel = '設定',
-}: {
-  title: string;
-  onBack: () => void;
-  backLabel?: string;
-}) {
-  return (
-    <View style={s.subHeader}>
-      <Pressable style={s.backButton} onPress={onBack}>
-        <Ionicons name="chevron-back" size={22} color="#20B2AA" />
-        <Text style={s.backText}>{backLabel}</Text>
-      </Pressable>
-      <Text style={s.subTitle}>{title}</Text>
-      <View style={s.backButton} />
-    </View>
-  );
-}
-
 // ─── MenuItem ─────────────────────────────────────────────────────────────────
 
 export function MenuItem({

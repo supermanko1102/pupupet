@@ -8,7 +8,7 @@ export type LogSignal = {
   risk_level: RiskLevel;
 };
 
-export const POOP_LOGS_KEY = 'poop_logs';
+const POOP_LOGS_KEY = 'poop_logs';
 export const HISTORY_PAGE_SIZE = 20;
 
 export const poopLogsKeys = {
@@ -45,7 +45,7 @@ function requireSupabase() {
 
 // ─── Batch signed URL helper ──────────────────────────────────────────────────
 
-export async function batchSignedUrls(paths: (string | null)[]): Promise<Map<string, string>> {
+async function batchSignedUrls(paths: (string | null)[]): Promise<Map<string, string>> {
   const validPaths = [...new Set(paths.filter((p): p is string => !!p))];
   if (!supabase || validPaths.length === 0) return new Map();
 
@@ -100,7 +100,7 @@ export type HistoryRow = {
   summary: string | null;
 };
 
-export function mapHistoryRow(row: HistoryRow, signedUrlMap: Map<string, string>): HistoryLog {
+function mapHistoryRow(row: HistoryRow, signedUrlMap: Map<string, string>): HistoryLog {
   const petName =
     row.pets && typeof row.pets === 'object' && 'name' in row.pets
       ? row.pets.name
