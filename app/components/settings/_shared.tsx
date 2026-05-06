@@ -57,6 +57,7 @@ export function MenuItem({
 
 // ─── Shared styles (re-exported for sub-screens) ──────────────────────────────
 
+/* eslint-disable react-native/no-unused-styles -- consumed by sibling settings screens */
 export const shared = StyleSheet.create({
   scroll: { flex: 1 },
   content: { padding: 20, paddingBottom: 40, gap: 12 },
@@ -68,6 +69,7 @@ export const shared = StyleSheet.create({
     overflow: 'hidden',
   },
 });
+/* eslint-enable react-native/no-unused-styles */
 
 const s = StyleSheet.create({
   subHeader: {
