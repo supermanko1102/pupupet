@@ -24,6 +24,7 @@ export const poopLogsKeys = {
 const LOG_WITH_PET_SELECT = [
   'id',
   'captured_at',
+  'failure_reason',
   'image_path',
   'status',
   'summary',
@@ -72,6 +73,7 @@ async function batchSignedUrls(paths: (string | null)[]): Promise<Map<string, st
 export type HistoryLog = {
   bristolScore: number | null;
   capturedAt: string;
+  failureReason: string | null;
   id: string;
   imagePath: string | null;
   imageUrl: string | null;
@@ -89,6 +91,7 @@ export type RecentLog = HistoryLog;
 type HistoryRow = {
   bristol_score: number | null;
   captured_at: string;
+  failure_reason: string | null;
   id: string;
   image_path: string | null;
   note: string | null;
@@ -109,6 +112,7 @@ function mapHistoryRow(row: HistoryRow, signedUrlMap: Map<string, string>): Hist
   return {
     bristolScore: row.bristol_score ?? null,
     capturedAt: row.captured_at,
+    failureReason: row.failure_reason ?? null,
     id: row.id,
     imagePath: row.image_path ?? null,
     imageUrl: row.image_path ? (signedUrlMap.get(row.image_path) ?? null) : null,

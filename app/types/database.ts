@@ -190,6 +190,7 @@ export type Database = {
           confidence: number | null
           consistency: string | null
           created_at: string
+          failure_reason: string | null
           id: string
           image_path: string
           model_version: string | null
@@ -209,6 +210,7 @@ export type Database = {
           confidence?: number | null
           consistency?: string | null
           created_at?: string
+          failure_reason?: string | null
           id?: string
           image_path: string
           model_version?: string | null
@@ -228,6 +230,7 @@ export type Database = {
           confidence?: number | null
           consistency?: string | null
           created_at?: string
+          failure_reason?: string | null
           id?: string
           image_path?: string
           model_version?: string | null

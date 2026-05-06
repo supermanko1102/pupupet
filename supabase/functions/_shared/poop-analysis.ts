@@ -6,12 +6,13 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY')!;
 
 const MODEL = 'claude-opus-4-5';
-const FAILURE_SUMMARY = '分析失敗，請重新拍照。';
+const SYSTEM_FAILURE_SUMMARY = '暫時無法完成分析，請稍後再試。';
 
 type ImageMediaType = 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
 type RiskLevel = 'normal' | 'observe' | 'vet';
 type PoopColor = 'brown' | 'yellow' | 'black' | 'red' | 'green' | 'other';
 type Consistency = 'hard' | 'normal' | 'soft' | 'liquid';
+type FailureReason = 'not_poop' | 'unclear' | 'system_error';
 
 type ImagePayload = {
   base64: string;
@@ -23,9 +24,11 @@ type Analysis = {
   color: PoopColor | null;
   confidence: number | null;
   consistency: Consistency | null;
+  failureReason: FailureReason | null;
+  isAnalyzable: boolean;
   raw: Record<string, unknown>;
   recommendation: string;
-  riskLevel: RiskLevel;
+  riskLevel: RiskLevel | null;
   summary: string;
 };
 
@@ -39,6 +42,7 @@ const IMAGE_MEDIA_TYPES = new Set<ImageMediaType>([
 const COLORS = new Set<PoopColor>(['brown', 'yellow', 'black', 'red', 'green', 'other']);
 const CONSISTENCIES = new Set<Consistency>(['hard', 'normal', 'soft', 'liquid']);
 const RISK_LEVELS = new Set<RiskLevel>(['normal', 'observe', 'vet']);
+const FAILURE_REASONS = new Set<FailureReason>(['not_poop', 'unclear', 'system_error']);
 
 export function toErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -68,6 +72,24 @@ export async function processOneJob(): Promise<{ success: boolean; id?: string; 
     const image = await fetchImageForAnalysis(imagePath, adminClient);
     const analysis = await analyzeWithClaude(image);
 
+    if (!analysis.isAnalyzable) {
+      await updateLog(id, {
+        status: 'failed',
+        bristol_score: null,
+        color: null,
+        consistency: null,
+        risk_level: null,
+        summary: analysis.summary,
+        recommendation: analysis.recommendation,
+        confidence: analysis.confidence,
+        failure_reason: analysis.failureReason ?? 'unclear',
+        model_version: MODEL,
+        ai_raw_json: analysis.raw,
+      });
+
+      return { success: true, id };
+    }
+
     await updateLog(id, {
       status: 'done',
       bristol_score: analysis.bristolScore,
@@ -77,6 +99,7 @@ export async function processOneJob(): Promise<{ success: boolean; id?: string; 
       summary: analysis.summary,
       recommendation: analysis.recommendation,
       confidence: analysis.confidence,
+      failure_reason: null,
       model_version: MODEL,
       ai_raw_json: analysis.raw,
     });
@@ -138,17 +161,26 @@ async function analyzeWithClaude(image: ImagePayload): Promise<Analysis> {
           },
           {
             type: 'text',
-            text: `你是一位寵物健康助理。請分析這張寵物糞便照片，並以 JSON 格式回傳以下欄位：
+            text: `你是一位寵物健康助理。請先判斷照片是否適合做寵物糞便健康分析，再以 JSON 格式回傳以下欄位：
 
 {
+  "isAnalyzable": <boolean，照片中有清楚可判讀的寵物糞便時為 true，否則 false>,
+  "failureReason": <null | "not_poop" | "unclear">,
   "bristolScore": <1-7 的整數，依據 Bristol Stool Scale，無法判斷填 null>,
-  "color": <"brown" | "yellow" | "black" | "red" | "green" | "other">,
-  "consistency": <"hard" | "normal" | "soft" | "liquid">,
-  "riskLevel": <"normal" | "observe" | "vet">,
+  "color": <null | "brown" | "yellow" | "black" | "red" | "green" | "other">,
+  "consistency": <null | "hard" | "normal" | "soft" | "liquid">,
+  "riskLevel": <null | "normal" | "observe" | "vet">,
   "summary": <給飼主看的一句話中文摘要，20 字以內>,
   "recommendation": <給飼主的中文建議，50 字以內>,
   "confidence": <0.0-1.0 的小數，代表分析可信度>
 }
+
+可分析判斷：
+- 如果照片看起來不是寵物糞便，isAnalyzable=false，failureReason="not_poop"
+- 如果照片太暗、太模糊、太遠、糞便被遮擋或不完整到無法判讀，isAnalyzable=false，failureReason="unclear"
+- isAnalyzable=false 時，bristolScore/color/consistency/riskLevel 都填 null
+- isAnalyzable=false 時，不要做健康判斷；summary 說明照片無法分析，recommendation 給重新拍攝建議
+- 只有照片中有清楚可判讀的寵物糞便時，isAnalyzable=true 並填健康分析欄位
 
 riskLevel 判斷標準：
 - normal：外觀正常，顏色棕色、形狀成形、軟硬適中，無任何異狀
@@ -195,16 +227,28 @@ function parseJsonObject(text: string): Record<string, unknown> {
 }
 
 function validateAnalysis(raw: Record<string, unknown>): Analysis {
+  const isAnalyzable = booleanWithFallback(raw.isAnalyzable, raw.riskLevel !== null && raw.riskLevel !== undefined);
+  const failureReason = isAnalyzable
+    ? null
+    : (nullableEnum(raw.failureReason, 'failureReason', FAILURE_REASONS) ?? 'unclear');
+
   return {
-    bristolScore: nullableInteger(raw.bristolScore, 'bristolScore', 1, 7),
-    color: nullableEnum(raw.color, 'color', COLORS),
+    bristolScore: isAnalyzable ? nullableInteger(raw.bristolScore, 'bristolScore', 1, 7) : null,
+    color: isAnalyzable ? nullableEnum(raw.color, 'color', COLORS) : null,
     confidence: nullableNumber(raw.confidence, 'confidence', 0, 1),
-    consistency: nullableEnum(raw.consistency, 'consistency', CONSISTENCIES),
+    consistency: isAnalyzable ? nullableEnum(raw.consistency, 'consistency', CONSISTENCIES) : null,
+    failureReason,
+    isAnalyzable,
     raw,
     recommendation: requiredText(raw.recommendation, 'recommendation', 120),
-    riskLevel: requiredEnum(raw.riskLevel, 'riskLevel', RISK_LEVELS),
+    riskLevel: isAnalyzable ? requiredEnum(raw.riskLevel, 'riskLevel', RISK_LEVELS) : null,
     summary: requiredText(raw.summary, 'summary', 80),
   };
+}
+
+function booleanWithFallback(value: unknown, fallback: boolean): boolean {
+  if (typeof value === 'boolean') return value;
+  return fallback;
 }
 
 function requiredText(value: unknown, field: string, maxLength: number): string {
@@ -291,18 +335,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 async function markJobFailed(id: string, error: string) {
   await updateLog(id, {
     status: 'failed',
-    summary: FAILURE_SUMMARY,
+    summary: SYSTEM_FAILURE_SUMMARY,
     recommendation: null,
+    failure_reason: 'system_error',
     model_version: MODEL,
     ai_raw_json: {
       error,
       failed_at: new Date().toISOString(),
       model_version: MODEL,
     },
-  });
-
-  await refundAnalysisUsage(id, error).catch((refundError) => {
-    console.error(`refund for job ${id} failed:`, refundError);
   });
 }
 
@@ -320,24 +361,5 @@ async function updateLog(id: string, fields: Record<string, unknown>) {
 
   if (!res.ok) {
     throw new Error(`updateLog failed: ${await res.text()}`);
-  }
-}
-
-async function refundAnalysisUsage(logId: string, reason: string) {
-  const res = await fetch(`${supabaseUrl}/rest/v1/rpc/refund_analysis_usage`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${supabaseServiceKey}`,
-      apikey: supabaseServiceKey,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      p_log_id: logId,
-      p_reason: reason.slice(0, 500),
-    }),
-  });
-
-  if (!res.ok) {
-    throw new Error(`refundAnalysisUsage failed: ${await res.text()}`);
   }
 }

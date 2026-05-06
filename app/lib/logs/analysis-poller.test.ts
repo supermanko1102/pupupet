@@ -17,6 +17,7 @@ function makeDeps(overrides: Partial<AnalysisPollerDeps> = {}): AnalysisPollerDe
 
 const baseLog: PolledAnalysisLog = {
   bristol_score: 4,
+  failure_reason: null,
   recommendation: '保持目前飲食。',
   risk_level: 'normal',
   status: 'pending',

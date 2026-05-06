@@ -15,6 +15,7 @@ import { PetPicker } from '@/components/pet-picker';
 import { Button } from '@/components/ui';
 import { riskBannerStyle, riskIcon, riskTitle } from '@/lib/logs/log-utils';
 import { cancelFollowUp, scheduleAbnormalFollowUp } from '@/lib/notifications';
+import type { AnalysisFailureReason } from '@/lib/photos/photo-analysis-result';
 import type { HistoryLog } from '@/hooks/use-poop-logs';
 import type { Database } from '@/types/database';
 import { Surface } from '@/constants/theme';
@@ -39,6 +40,9 @@ export function LogDetailContent({
   isAssigningPet = false,
 }: Props) {
   const isFollowUp = variant === 'follow-up';
+  const isFailed = log.status === 'failed';
+  const failureReason = normalizeFailureReason(log.failureReason);
+  const failure = failureCopy(failureReason);
 
   return (
     <ScrollView style={ms.resultScroll} contentContainerStyle={ms.resultContent}>
@@ -51,19 +55,29 @@ export function LogDetailContent({
       )}
 
       <View style={ms.resultBody}>
-        <View style={[ms.riskBanner, riskBannerStyle(log.riskLevel)]}>
-          <Text style={ms.riskBannerIcon}>{riskIcon(log.riskLevel)}</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={[ms.riskBannerTitle, { color: riskBannerStyle(log.riskLevel).textColor }]}>
-              {riskTitle(log.riskLevel)}
-            </Text>
-            {log.summary ? (
-              <Text style={[ms.riskBannerSub, { color: riskBannerStyle(log.riskLevel).textColor }]}>
-                {log.summary}
-              </Text>
-            ) : null}
+        {isFailed ? (
+          <View style={styles.failureBox}>
+            <View style={styles.failureIconWrap}>
+              <Ionicons name={failure.icon} size={24} color={failure.iconColor} />
+            </View>
+            <Text style={styles.failureTitle}>{failure.title}</Text>
+            <Text style={styles.failureSubtitle}>{failure.subtitle}</Text>
           </View>
-        </View>
+        ) : (
+          <View style={[ms.riskBanner, riskBannerStyle(log.riskLevel)]}>
+            <Text style={ms.riskBannerIcon}>{riskIcon(log.riskLevel)}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={[ms.riskBannerTitle, { color: riskBannerStyle(log.riskLevel).textColor }]}>
+                {riskTitle(log.riskLevel)}
+              </Text>
+              {log.summary ? (
+                <Text style={[ms.riskBannerSub, { color: riskBannerStyle(log.riskLevel).textColor }]}>
+                  {log.summary}
+                </Text>
+              ) : null}
+            </View>
+          </View>
+        )}
 
         {log.note ? (
           <View style={ms.recommendBox}>
@@ -72,14 +86,14 @@ export function LogDetailContent({
           </View>
         ) : null}
 
-        {log.recommendation ? (
+        {!isFailed && log.recommendation ? (
           <View style={ms.recommendBox}>
             <Text style={ms.recommendLabel}>建議</Text>
             <Text style={ms.recommendText}>{log.recommendation}</Text>
           </View>
         ) : null}
 
-        {log.petId ? (
+        {isFailed ? null : log.petId ? (
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>寵物</Text>
             <Text style={styles.infoValue}>{log.petName}</Text>
@@ -106,7 +120,7 @@ export function LogDetailContent({
         </View>
       </View>
 
-      {isFollowUp && log.riskLevel !== 'normal' ? (
+      {isFollowUp && !isFailed && log.riskLevel !== 'normal' ? (
         <View style={ms.modalActions}>
           <Text style={styles.followUpLabel}>今天恢復正常了嗎？</Text>
           <Button
@@ -128,6 +142,38 @@ export function LogDetailContent({
   );
 }
 
+function normalizeFailureReason(value: string | null | undefined): AnalysisFailureReason {
+  if (value === 'not_poop' || value === 'unclear' || value === 'system_error') return value;
+  return 'system_error';
+}
+
+function failureCopy(reason: AnalysisFailureReason) {
+  if (reason === 'not_poop') {
+    return {
+      icon: 'image-outline' as const,
+      iconColor: Surface.inkSoft,
+      subtitle: '看起來不像可判讀的便便照片。請重新拍攝清楚、完整的便便畫面。',
+      title: '這張照片無法分析',
+    };
+  }
+
+  if (reason === 'unclear') {
+    return {
+      icon: 'scan-outline' as const,
+      iconColor: Surface.inkSoft,
+      subtitle: 'AI 無法從這張照片判讀健康狀況，請重新拍攝更清楚的畫面。',
+      title: '照片不夠清楚',
+    };
+  }
+
+  return {
+    icon: 'cloud-offline-outline' as const,
+    iconColor: '#92400e',
+    subtitle: '連線或分析服務暫時不穩，請稍後再試。',
+    title: '暫時無法完成分析',
+  };
+}
+
 type ModalProps = Omit<Props, 'log'> & {
   log: HistoryLog | null;
 };
@@ -144,6 +190,26 @@ export function LogDetailModal({ log, ...rest }: ModalProps) {
 
 const styles = StyleSheet.create({
   imageFallback: { alignItems: 'center', backgroundColor: Surface.bgMuted, justifyContent: 'center' },
+
+  failureBox: {
+    alignItems: 'center',
+    backgroundColor: Surface.bgSoft,
+    borderColor: Surface.border,
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 10,
+    padding: 18,
+  },
+  failureIconWrap: {
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 999,
+    height: 50,
+    justifyContent: 'center',
+    width: 50,
+  },
+  failureTitle: { color: Surface.ink, fontSize: 18, fontWeight: '800', textAlign: 'center' },
+  failureSubtitle: { color: Surface.muted, fontSize: 14, lineHeight: 21, textAlign: 'center' },
 
   infoRow: {
     alignItems: 'center', backgroundColor: Surface.bgSoft, borderRadius: 12,

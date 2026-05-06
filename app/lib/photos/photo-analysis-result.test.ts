@@ -9,6 +9,7 @@ import {
 
 const completedLog: PolledAnalysisLog = {
   bristol_score: 4,
+  failure_reason: null,
   recommendation: 'Keep monitoring hydration.',
   risk_level: 'normal',
   status: 'done',
@@ -19,6 +20,7 @@ describe('photo analysis result helpers', () => {
   it('creates a normal completed analysis result', () => {
     expect(createCompletedAnalysisResult(completedLog, 'signed-url')).toEqual({
       bristolScore: 4,
+      failureReason: null,
       failed: false,
       imageUrl: 'signed-url',
       recommendation: 'Keep monitoring hydration.',
@@ -30,23 +32,26 @@ describe('photo analysis result helpers', () => {
   it('normalizes failed analysis results for the modal', () => {
     expect(createCompletedAnalysisResult({
       ...completedLog,
+      failure_reason: 'not_poop',
       recommendation: 'ignored',
       risk_level: 'vet',
       status: 'failed',
       summary: 'ignored',
     }, 'preview-url')).toEqual({
       bristolScore: 4,
+      failureReason: 'not_poop',
       failed: true,
       imageUrl: 'preview-url',
       recommendation: null,
       riskLevel: null,
-      summary: '分析失敗，請重新拍照。',
+      summary: 'ignored',
     });
   });
 
   it('creates polling failure results with the default recommendation', () => {
     expect(createPollingFailureResult('分析時間較長，稍後可在歷程查看結果。', 'preview-url')).toEqual({
       bristolScore: null,
+      failureReason: 'system_error',
       failed: true,
       imageUrl: 'preview-url',
       recommendation: '你可以先離開此畫面，稍後到歷程查看是否完成分析。',

@@ -39,11 +39,17 @@ export function riskBannerStyle(riskLevel: RiskLevel): {
 // ─── Log Status ───────────────────────────────────────────────────────────────
 
 type LogLike = {
+  failureReason?: string | null;
   riskLevel: RiskLevel;
   status: string;
 };
 
 export function logStatusLabel(log: LogLike): string {
+  if (log.status === 'failed') {
+    if (log.failureReason === 'not_poop') return '無法分析';
+    if (log.failureReason === 'unclear') return '不夠清楚';
+    return '失敗';
+  }
   if (log.status !== 'done') return '分析中';
   if (log.riskLevel === 'normal') return '正常';
   if (log.riskLevel === 'observe') return '觀察';
@@ -52,6 +58,7 @@ export function logStatusLabel(log: LogLike): string {
 }
 
 export function logStatusTone(log: LogLike): LogTone {
+  if (log.status === 'failed') return log.failureReason === 'system_error' ? 'warning' : 'neutral';
   if (log.riskLevel === 'normal') return 'success';
   if (log.riskLevel === 'observe') return 'warning';
   if (log.riskLevel === 'vet') return 'danger';

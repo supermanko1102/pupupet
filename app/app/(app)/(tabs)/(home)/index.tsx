@@ -1,4 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import {
   Pressable,
@@ -11,7 +12,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
-import { NotificationDebugPanel } from '@/components/dev/notification-debug-panel';
 import { LogDetailModal } from '@/components/log-detail-content';
 import { PhotoAnalysisModal } from '@/components/photo-analysis-modal';
 import { useLogDetailFlow } from '@/hooks/use-log-detail-flow';
@@ -24,6 +24,25 @@ import { useSession } from '@/providers/session-provider';
 import { Brand, Ripple, Surface } from '@/constants/theme';
 
 // ─── Home Screen ──────────────────────────────────────────────────────────────
+
+const BACKGROUND_STEP_COPY = {
+  uploading: '正在上傳照片',
+  creating: '正在建立紀錄',
+  analyzing: 'AI 分析中',
+  finalizing: '正在整理結果',
+} as const;
+
+function backgroundFailureTitle(reason: string) {
+  if (reason === 'not_poop') return '照片無法分析';
+  if (reason === 'unclear') return '照片不夠清楚';
+  return '暫時無法完成分析';
+}
+
+function backgroundFailureSubtitle(reason: string) {
+  if (reason === 'not_poop') return '請重新拍攝清楚、完整的便便畫面。';
+  if (reason === 'unclear') return '請重新拍攝光線足夠、不模糊的照片。';
+  return '連線或分析服務暫時不穩，請稍後再試。';
+}
 
 export default function HomeScreen() {
   const { user } = useSession();
@@ -51,16 +70,47 @@ export default function HomeScreen() {
     router.navigate('/history' as never);
   }
 
+  function handleOpenBackgroundAnalysis() {
+    lightImpactFeedback();
+    photoAnalysisFlow.openPhotoModal();
+  }
+
+  const showBackgroundAnalysisCard =
+    !!photoAnalysisFlow.capturedAsset
+    && !photoAnalysisFlow.isPhotoModalVisible
+    && (photoAnalysisFlow.modalPhase === 'processing' || !!photoAnalysisFlow.analysisResult);
+  const backgroundAnalysisDone = photoAnalysisFlow.modalPhase === 'result' && !!photoAnalysisFlow.analysisResult;
+  const backgroundAnalysisFailed = !!photoAnalysisFlow.analysisResult?.failed;
+  const backgroundFailureReason = photoAnalysisFlow.analysisResult?.failureReason ?? 'system_error';
+  const backgroundProgress = Math.max(0, Math.min(1, photoAnalysisFlow.processingProgress));
+  const backgroundTitle = backgroundAnalysisDone
+    ? backgroundAnalysisFailed ? backgroundFailureTitle(backgroundFailureReason) : '分析完成'
+    : BACKGROUND_STEP_COPY[photoAnalysisFlow.processingStep];
+  const backgroundSubtitle = backgroundAnalysisDone
+    ? backgroundAnalysisFailed
+      ? backgroundFailureSubtitle(backgroundFailureReason)
+      : '結果已準備好，點開即可查看。'
+    : backgroundProgress >= 0.9
+      ? '快好了，完成後會更新到最近狀態。'
+      : '背景持續處理中，通常需要 10-30 秒。';
+
   return (
     <>
     <PhotoAnalysisModal
       capturedAsset={photoAnalysisFlow.capturedAsset}
+      isVisible={photoAnalysisFlow.isPhotoModalVisible}
       modalPhase={photoAnalysisFlow.modalPhase}
+      processingProgress={photoAnalysisFlow.processingProgress}
+      processingStep={photoAnalysisFlow.processingStep}
+      canDismissProcessing={photoAnalysisFlow.canDismissProcessing}
       analysisResult={photoAnalysisFlow.analysisResult}
       petAssigned={photoAnalysisFlow.petAssigned}
       pets={pets}
       onAssignPet={(petId) => void photoAnalysisFlow.assignPet(petId)}
       onClose={photoAnalysisFlow.closePhotoModal}
+      onDismissProcessing={photoAnalysisFlow.dismissProcessingModal}
+      onPickPhoto={handlePickFromLibrary}
+      onRetake={handleStartScan}
     />
 
     <LinearGradient
@@ -107,6 +157,68 @@ export default function HomeScreen() {
                 <Text style={styles.libraryButtonText}>從相簿補一筆</Text>
               </Pressable>
 
+              {showBackgroundAnalysisCard && (
+                <View style={styles.backgroundAnalysisSection}>
+                  <View style={styles.backgroundAnalysisCard}>
+                    <Image
+                      source={{ uri: photoAnalysisFlow.capturedAsset?.uri }}
+                      style={styles.backgroundAnalysisImage}
+                      contentFit="cover"
+                    />
+                    <View style={styles.backgroundAnalysisBody}>
+                      <View style={styles.backgroundAnalysisTopRow}>
+                        <View style={styles.backgroundAnalysisTitleWrap}>
+                          <Text style={styles.backgroundAnalysisTitle}>{backgroundTitle}</Text>
+                          <Text style={styles.backgroundAnalysisSubtitle}>{backgroundSubtitle}</Text>
+                        </View>
+                        <View style={[
+                          styles.backgroundAnalysisIcon,
+                          backgroundAnalysisFailed
+                            ? styles.backgroundAnalysisIconFailed
+                            : backgroundAnalysisDone && styles.backgroundAnalysisIconDone,
+                        ]}>
+                          <Ionicons
+                            name={backgroundAnalysisFailed ? 'alert-circle-outline' : backgroundAnalysisDone ? 'checkmark' : 'sparkles-outline'}
+                            size={15}
+                            color={backgroundAnalysisFailed ? '#92400e' : backgroundAnalysisDone ? '#ffffff' : Brand.primary}
+                          />
+                        </View>
+                      </View>
+                      <View style={styles.backgroundProgressTrack}>
+                        <View style={[
+                          styles.backgroundProgressFill,
+                          { width: `${backgroundProgress * 100}%` },
+                          backgroundAnalysisDone && styles.backgroundProgressDone,
+                        ]} />
+                      </View>
+                      <View style={styles.backgroundAnalysisActions}>
+                        <Text style={styles.backgroundAnalysisHint}>
+                          {backgroundAnalysisDone ? '結果已在這裡等你' : '你可以先做其他事'}
+                        </Text>
+                        <Pressable
+                          android_ripple={Ripple.onDark}
+                          style={({ pressed }) => [styles.backgroundPrimaryButton, pressed && styles.buttonPressed]}
+                          onPress={backgroundAnalysisFailed ? handleStartScan : handleOpenBackgroundAnalysis}>
+                          <Text style={styles.backgroundPrimaryButtonText}>
+                            {backgroundAnalysisFailed
+                              ? backgroundFailureReason === 'system_error' ? '再試一次' : '重新拍照'
+                              : backgroundAnalysisDone ? '看結果' : '查看進度'}
+                          </Text>
+                        </Pressable>
+                        <Pressable
+                          android_ripple={Ripple.onLight}
+                          style={({ pressed }) => [styles.backgroundHistoryButton, pressed && styles.buttonPressed]}
+                          onPress={backgroundAnalysisFailed ? handlePickFromLibrary : handleOpenHistory}>
+                          <Text style={styles.backgroundHistoryButtonText}>
+                            {backgroundAnalysisFailed ? '選照片' : '歷程'}
+                          </Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              )}
+
               <View style={styles.summarySection}>
                 <Text style={styles.summarySectionTitle}>最近狀態</Text>
                 <View style={styles.summaryCard}>
@@ -152,12 +264,12 @@ export default function HomeScreen() {
                 </View>
               )}
 
-              {__DEV__ && (
+              {/* {__DEV__ && (
                 <NotificationDebugPanel
                   recentLogs={recentLogs}
                   onOpenFollowUp={(log) => logDetailFlow.openLogDetail(log, { isFollowUp: true })}
                 />
-              )}
+              )} */}
             </ScrollView>
           </View>
         </View>
@@ -230,6 +342,64 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   libraryButtonText: { color: Surface.muted, fontSize: 14, fontWeight: '500' },
+
+  backgroundAnalysisSection: { marginBottom: 28, paddingHorizontal: 20, width: '100%' },
+  backgroundAnalysisCard: {
+    backgroundColor: '#ffffff',
+    borderColor: Surface.border,
+    borderRadius: 18,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 12,
+    overflow: 'hidden',
+    padding: 12,
+  },
+  backgroundAnalysisImage: { borderRadius: 12, height: 86, width: 72 },
+  backgroundAnalysisBody: { flex: 1, gap: 10, minWidth: 0 },
+  backgroundAnalysisTopRow: { alignItems: 'flex-start', flexDirection: 'row', gap: 10 },
+  backgroundAnalysisTitleWrap: { flex: 1, gap: 3, minWidth: 0 },
+  backgroundAnalysisTitle: { color: Surface.ink, fontSize: 16, fontWeight: '800', lineHeight: 21 },
+  backgroundAnalysisSubtitle: { color: Surface.muted, fontSize: 12, lineHeight: 17 },
+  backgroundAnalysisIcon: {
+    alignItems: 'center',
+    backgroundColor: Surface.bgSoft,
+    borderRadius: 999,
+    height: 28,
+    justifyContent: 'center',
+    width: 28,
+  },
+  backgroundAnalysisIconDone: { backgroundColor: Brand.primary },
+  backgroundAnalysisIconFailed: { backgroundColor: '#fef3c7' },
+  backgroundProgressTrack: {
+    backgroundColor: Surface.bgMuted,
+    borderRadius: 999,
+    height: 7,
+    overflow: 'hidden',
+  },
+  backgroundProgressFill: {
+    backgroundColor: Brand.primary,
+    borderRadius: 999,
+    height: '100%',
+  },
+  backgroundProgressDone: { backgroundColor: '#16a34a' },
+  backgroundAnalysisActions: { alignItems: 'center', flexDirection: 'row', gap: 8 },
+  backgroundAnalysisHint: { color: Surface.mutedSoft, flex: 1, fontSize: 12, fontWeight: '600' },
+  backgroundPrimaryButton: {
+    backgroundColor: Brand.primary,
+    borderRadius: 999,
+    overflow: 'hidden',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  backgroundPrimaryButtonText: { color: '#ffffff', fontSize: 12, fontWeight: '800' },
+  backgroundHistoryButton: {
+    backgroundColor: Surface.bgSoft,
+    borderRadius: 999,
+    overflow: 'hidden',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  backgroundHistoryButtonText: { color: Surface.inkSoft, fontSize: 12, fontWeight: '800' },
 
   summarySection: { gap: 10, paddingHorizontal: 20, width: '100%' },
   summarySectionTitle: { color: Surface.ink, fontSize: 17, fontWeight: '700' },
