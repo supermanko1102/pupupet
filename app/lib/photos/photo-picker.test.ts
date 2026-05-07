@@ -5,10 +5,9 @@ import { PHOTO_PICKER_OPTIONS, firstPickedAsset } from '@/lib/photos/photo-picke
 describe('photo picker helpers', () => {
   it('keeps a single shared picker configuration', () => {
     expect(PHOTO_PICKER_OPTIONS).toMatchObject({
-      allowsEditing: true,
-      aspect: [4, 3],
+      allowsEditing: false,
       mediaTypes: ['images'],
-      quality: 0.85,
+      quality: 1,
     });
   });
 

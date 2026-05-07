@@ -1,16 +1,19 @@
-import * as ImagePicker from 'expo-image-picker';
 import { useQueryClient } from '@tanstack/react-query';
+import * as ImagePicker from 'expo-image-picker';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Platform } from 'react-native';
 
 import type { AnalysisResult } from '@/components/photo-analysis-modal';
 import { useAssignPet } from '@/hooks/use-pets';
-import { pollAnalysisOnce, type AnalysisPollerDeps } from '@/lib/logs/analysis-poller';
 import { createAnalysisLog } from '@/lib/logs/analysis';
-import { scheduleAbnormalFollowUp } from '@/lib/notifications';
-import { createPollingFailureResult, shouldScheduleAnalysisFollowUp } from '@/lib/photos/photo-analysis-result';
-import { PHOTO_PICKER_OPTIONS, firstPickedAsset } from '@/lib/photos/photo-picker';
+import { pollAnalysisOnce, type AnalysisPollerDeps } from '@/lib/logs/analysis-poller';
 import { PollingController } from '@/lib/logs/polling-controller';
+import { scheduleAbnormalFollowUp } from '@/lib/notifications';
+import {
+  createPollingFailureResult,
+  shouldScheduleAnalysisFollowUp,
+} from '@/lib/photos/photo-analysis-result';
+import { PHOTO_PICKER_OPTIONS, firstPickedAsset } from '@/lib/photos/photo-picker';
 import { deletePoopPhoto, uploadPoopPhoto } from '@/lib/photos/uploads';
 import { supabase } from '@/lib/supabase';
 import { BILLING_KEY, useBilling } from '@/providers/billing-provider';
@@ -41,10 +44,12 @@ export function usePhotoAnalysisFlow({ onLogsUpdated }: Props) {
   const billing = useBilling();
   const assignPetMutation = useAssignPet();
   const queryClient = useQueryClient();
-  const pollingRef = useRef(new PollingController<ReturnType<typeof setInterval>>({
-    maxErrors: MAX_POLL_ERRORS,
-    timeoutMs: POLL_TIMEOUT_MS,
-  }));
+  const pollingRef = useRef(
+    new PollingController<ReturnType<typeof setInterval>>({
+      maxErrors: MAX_POLL_ERRORS,
+      timeoutMs: POLL_TIMEOUT_MS,
+    }),
+  );
   const resultTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isPhotoModalVisibleRef = useRef(false);
 
@@ -101,7 +106,7 @@ export function usePhotoAnalysisFlow({ onLogsUpdated }: Props) {
 
   const dismissProcessingModal = useCallback(() => {
     setIsPhotoModalVisible(false);
-    void onLogsUpdated();
+    onLogsUpdated();
   }, [onLogsUpdated]);
 
   const openPhotoModal = useCallback(() => {
@@ -140,127 +145,149 @@ export function usePhotoAnalysisFlow({ onLogsUpdated }: Props) {
     return () => clearInterval(timer);
   }, [modalPhase, processingStep, processingStepStartedAt]);
 
-  const showPollingFailure = useCallback((
-    summary: string,
-    previewUri: string,
-    recommendation: string | null = '你可以先離開此畫面，稍後到歷程查看是否完成分析。'
-  ) => {
-    stopPolling();
+  const showPollingFailure = useCallback(
+    (
+      summary: string,
+      previewUri: string,
+      recommendation: string | null = '你可以先離開此畫面，稍後到歷程查看是否完成分析。',
+    ) => {
+      stopPolling();
 
-    setAnalysisResult(createPollingFailureResult(summary, previewUri, recommendation));
-    setProcessingProgress(1);
-    setModalPhase('result');
-    void onLogsUpdated();
-  }, [onLogsUpdated, stopPolling]);
+      setAnalysisResult(createPollingFailureResult(summary, previewUri, recommendation));
+      setProcessingProgress(1);
+      setModalPhase('result');
+      onLogsUpdated();
+    },
+    [onLogsUpdated, stopPolling],
+  );
 
-  const startPolling = useCallback((logId: string, imagePath: string, previewUri: string) => {
-    stopPolling();
+  const startPolling = useCallback(
+    (logId: string, imagePath: string, previewUri: string) => {
+      stopPolling();
 
-    if (!supabase) return;
-    const client = supabase;
+      if (!supabase) return;
+      const client = supabase;
 
-    const deps: AnalysisPollerDeps = {
-      fetchLogStatus: async (id) => {
-        const { data, error } = await client
-          .from('poop_logs')
-          .select('status, bristol_score, failure_reason, risk_level, summary, recommendation')
-          .eq('id', id)
-          .single();
-        return { data, error };
-      },
-      createSignedUrl: async (path) => {
-        const { data } = await client.storage
-          .from('poop-photos')
-          .createSignedUrl(path, 60 * 60);
-        return data?.signedUrl ?? null;
-      },
-    };
+      const deps: AnalysisPollerDeps = {
+        fetchLogStatus: async (id) => {
+          const { data, error } = await client
+            .from('poop_logs')
+            .select('status, bristol_score, failure_reason, risk_level, summary, recommendation')
+            .eq('id', id)
+            .single();
+          return { data, error };
+        },
+        createSignedUrl: async (path) => {
+          const { data } = await client.storage.from('poop-photos').createSignedUrl(path, 60 * 60);
+          return data?.signedUrl ?? null;
+        },
+      };
 
-    const timer = setInterval(async () => {
-      const outcome = await pollAnalysisOnce({
-        controller: pollingRef.current,
-        deps,
-        imagePath,
-        logId,
-        previewUri,
-      });
+      const timer = setInterval(async () => {
+        const outcome = await pollAnalysisOnce({
+          controller: pollingRef.current,
+          deps,
+          imagePath,
+          logId,
+          previewUri,
+        });
 
-      switch (outcome.kind) {
-        case 'pending':
-        case 'skipped':
-          return;
-        case 'timeout':
-          showPollingFailure('分析時間較長，稍後可在歷程查看結果。', previewUri);
-          return;
-        case 'fatal-error':
-          showPollingFailure('連線不穩，暫時無法確認分析結果。', previewUri);
-          return;
-        case 'completed':
-          stopPolling();
-          setProcessingStage('finalizing');
-          setAnalysisResult(outcome.result);
-          if (shouldScheduleAnalysisFollowUp(outcome.result.riskLevel)) {
-            void scheduleAbnormalFollowUp(outcome.logId);
-          }
-          setProcessingProgress(1);
-          clearResultTimer();
-          resultTimerRef.current = setTimeout(() => {
-            resultTimerRef.current = null;
-            setModalPhase('result');
-          }, isPhotoModalVisibleRef.current ? SHOW_RESULT_AFTER_PROGRESS_MS : 0);
-          void onLogsUpdated();
-          return;
+        switch (outcome.kind) {
+          case 'pending':
+          case 'skipped':
+            return;
+          case 'timeout':
+            showPollingFailure('分析時間較長，稍後可在歷程查看結果。', previewUri);
+            return;
+          case 'fatal-error':
+            showPollingFailure('連線不穩，暫時無法確認分析結果。', previewUri);
+            return;
+          case 'completed':
+            stopPolling();
+            setProcessingStage('finalizing');
+            setAnalysisResult(outcome.result);
+            if (shouldScheduleAnalysisFollowUp(outcome.result.riskLevel)) {
+              scheduleAbnormalFollowUp(outcome.logId);
+            }
+            setProcessingProgress(1);
+            clearResultTimer();
+            resultTimerRef.current = setTimeout(
+              () => {
+                resultTimerRef.current = null;
+                setModalPhase('result');
+              },
+              isPhotoModalVisibleRef.current ? SHOW_RESULT_AFTER_PROGRESS_MS : 0,
+            );
+            onLogsUpdated();
+            return;
+        }
+      }, POLL_INTERVAL_MS);
+
+      pollingRef.current.start(timer);
+    },
+    [clearResultTimer, onLogsUpdated, setProcessingStage, showPollingFailure, stopPolling],
+  );
+
+  const uploadAsset = useCallback(
+    async (asset: ImagePicker.ImagePickerAsset) => {
+      if (!supabase || !user) return;
+
+      clearResultTimer();
+      stopPolling();
+      setCapturedAsset(asset);
+      setIsPhotoModalVisible(true);
+      setModalPhase('processing');
+      setAnalysisResult(null);
+      setCurrentLogId(null);
+      setPetAssigned(false);
+      setProcessingStartedAt(Date.now());
+      setProcessingProgress(0);
+      setProcessingStage('uploading');
+      setIsUploading(true);
+
+      let imagePath: string | null = null;
+
+      try {
+        imagePath = await uploadPoopPhoto(user.id, asset);
+        setProcessingStage('creating');
+        const newLog = await createAnalysisLog(imagePath);
+
+        queryClient.invalidateQueries({ queryKey: [BILLING_KEY, user.id] });
+        setCurrentLogId(newLog.log_id);
+        onLogsUpdated();
+        setProcessingStage('analyzing');
+        startPolling(newLog.log_id, newLog.image_path, asset.uri);
+      } catch (error) {
+        if (imagePath) {
+          deletePoopPhoto(imagePath);
+        }
+        Alert.alert('上傳失敗', error instanceof Error ? error.message : '請稍後再試。');
+        closePhotoModal();
+      } finally {
+        setIsUploading(false);
       }
-    }, POLL_INTERVAL_MS);
+    },
+    [
+      clearResultTimer,
+      closePhotoModal,
+      onLogsUpdated,
+      queryClient,
+      setProcessingStage,
+      startPolling,
+      stopPolling,
+      user,
+    ],
+  );
 
-    pollingRef.current.start(timer);
-  }, [clearResultTimer, onLogsUpdated, setProcessingStage, showPollingFailure, stopPolling]);
-
-  const uploadAsset = useCallback(async (asset: ImagePicker.ImagePickerAsset) => {
-    if (!supabase || !user) return;
-
-    clearResultTimer();
-    stopPolling();
-    setCapturedAsset(asset);
-    setIsPhotoModalVisible(true);
-    setModalPhase('processing');
-    setAnalysisResult(null);
-    setCurrentLogId(null);
-    setPetAssigned(false);
-    setProcessingStartedAt(Date.now());
-    setProcessingProgress(0);
-    setProcessingStage('uploading');
-    setIsUploading(true);
-
-    let imagePath: string | null = null;
-
-    try {
-      imagePath = await uploadPoopPhoto(user.id, asset);
-      setProcessingStage('creating');
-      const newLog = await createAnalysisLog(imagePath);
-
-      void queryClient.invalidateQueries({ queryKey: [BILLING_KEY, user.id] });
-      setCurrentLogId(newLog.log_id);
-      void onLogsUpdated();
-      setProcessingStage('analyzing');
-      startPolling(newLog.log_id, newLog.image_path, asset.uri);
-    } catch (error) {
-      if (imagePath) {
-        void deletePoopPhoto(imagePath);
-      }
-      Alert.alert('上傳失敗', error instanceof Error ? error.message : '請稍後再試。');
-      closePhotoModal();
-    } finally {
-      setIsUploading(false);
-    }
-  }, [clearResultTimer, closePhotoModal, onLogsUpdated, queryClient, setProcessingStage, startPolling, stopPolling, user]);
-
-  const assignPet = useCallback(async (petId: string) => {
-    if (!currentLogId) return;
-    await assignPetMutation.mutateAsync({ logId: currentLogId, petId });
-    setPetAssigned(true);
-    void onLogsUpdated();
-  }, [assignPetMutation, currentLogId, onLogsUpdated]);
+  const assignPet = useCallback(
+    async (petId: string) => {
+      if (!currentLogId) return;
+      await assignPetMutation.mutateAsync({ logId: currentLogId, petId });
+      setPetAssigned(true);
+      onLogsUpdated();
+    },
+    [assignPetMutation, currentLogId, onLogsUpdated],
+  );
 
   const startScan = useCallback(async () => {
     if (isPreparingAnalysis || isUploading) return;
@@ -287,7 +314,7 @@ export function usePhotoAnalysisFlow({ onLogsUpdated }: Props) {
 
     const asset = firstPickedAsset(await ImagePicker.launchCameraAsync(PHOTO_PICKER_OPTIONS));
     if (!asset) return;
-    void uploadAsset(asset);
+    uploadAsset(asset);
   }, [billing, isPreparingAnalysis, isUploading, uploadAsset]);
 
   const pickFromLibrary = useCallback(async () => {
@@ -310,14 +337,14 @@ export function usePhotoAnalysisFlow({ onLogsUpdated }: Props) {
 
     const asset = firstPickedAsset(await ImagePicker.launchImageLibraryAsync(PHOTO_PICKER_OPTIONS));
     if (!asset) return;
-    void uploadAsset(asset);
+    uploadAsset(asset);
   }, [billing, isPreparingAnalysis, isUploading, uploadAsset]);
 
   const canDismissProcessing =
-    modalPhase === 'processing'
-    && !!currentLogId
-    && !!processingStartedAt
-    && Date.now() - processingStartedAt >= DISMISS_PROCESSING_AFTER_MS;
+    modalPhase === 'processing' &&
+    !!currentLogId &&
+    !!processingStartedAt &&
+    Date.now() - processingStartedAt >= DISMISS_PROCESSING_AFTER_MS;
 
   return {
     analysisResult,
