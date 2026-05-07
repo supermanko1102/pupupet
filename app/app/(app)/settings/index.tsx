@@ -12,6 +12,7 @@ export default function SettingsIndexScreen() {
         <View style={s.section}>
           <MenuItem icon="paw" label="寵物管理" onPress={() => router.push('/settings/pets' as never)} />
           <MenuItem icon="sparkles" label="PupuPet Plus" onPress={() => router.push('/settings/plus' as never)} />
+          <MenuItem icon="notifications" label="通知設定" onPress={() => router.push('/settings/notifications' as never)} />
           <MenuItem icon="person" label="帳號管理" onPress={() => router.push('/settings/account' as never)} isLast />
         </View>
 
