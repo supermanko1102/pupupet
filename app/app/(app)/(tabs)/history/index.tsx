@@ -11,9 +11,16 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { HistoryEmptyRecords } from '@/components/history/history-empty-records';
 import { HistoryHeader } from '@/components/history/header';
+import { HistoryEmptyRecords } from '@/components/history/history-empty-records';
 import { HistoryLogCard } from '@/components/history/history-log-card';
+import { Surface } from '@/constants/theme';
+import {
+  useHistoryLogs,
+  useHistoryLogsForDate,
+  useStats,
+  useTrendSummary,
+} from '@/hooks/use-poop-logs';
 import {
   buildCurrentMonthDays,
   buildRangeSummary,
@@ -24,13 +31,6 @@ import {
   type DayMetric,
   type RangeKey,
 } from '@/lib/logs/history-metrics';
-import {
-  useHistoryLogs,
-  useHistoryLogsForDate,
-  useStats,
-  useTrendSummary,
-} from '@/hooks/use-poop-logs';
-import { Surface } from '@/constants/theme';
 
 export default function HistoryScreen() {
   const [rangeKey, setRangeKey] = useState<RangeKey>('7d');
@@ -66,16 +66,17 @@ export default function HistoryScreen() {
   const currentRangeDays = RANGE_OPTIONS.find((option) => option.key === rangeKey)?.days ?? 7;
   const rangeDays = useMemo(
     () => buildRecentDays(statsRows, currentRangeDays),
-    [currentRangeDays, statsRows]
+    [currentRangeDays, statsRows],
   );
   const monthDays = useMemo(() => buildCurrentMonthDays(statsRows), [statsRows]);
   const rangeSummary = useMemo(() => buildRangeSummary(rangeDays), [rangeDays]);
   const recordDays = useMemo(
-    () => monthDays
-      .filter((day: DayMetric) => day.count > 0)
-      .slice()
-      .reverse(),
-    [monthDays]
+    () =>
+      monthDays
+        .filter((day: DayMetric) => day.count > 0)
+        .slice()
+        .reverse(),
+    [monthDays],
   );
 
   const baseLogs = selectedDate ? selectedDayLogs : logs;
@@ -141,9 +142,9 @@ export default function HistoryScreen() {
           refreshControl={
             <RefreshControl
               refreshing={
-                (isRefetching && !isFetchingNextPage)
-                || isStatsRefetching
-                || isSelectedDayRefetching
+                (isRefetching && !isFetchingNextPage) ||
+                isStatsRefetching ||
+                isSelectedDayRefetching
               }
               onRefresh={handleRefresh}
               tintColor="#20B2AA"
