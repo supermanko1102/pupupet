@@ -168,8 +168,6 @@ export function BillingProvider({ children }: PropsWithChildren) {
 
     // 3) 還是 free_exhausted → 引導付費
     if (await showPaywall()) return true;
-
-    Alert.alert('需要 PupuPet Plus', '免費分析次數已用完，訂閱後即可繼續使用 AI 分析。');
     return false;
   }, [billingQuery.data, refreshBilling, showPaywall, user]);
 
