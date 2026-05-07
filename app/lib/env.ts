@@ -1,10 +1,6 @@
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL?.trim() ?? '';
 const supabasePublishableKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ?? '';
-const revenueCatIosApiKey =
-  (__DEV__
-    ? process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY_DEV
-    : process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY
-  )?.trim() ?? '';
+const revenueCatIosApiKey = process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY?.trim() ?? '';
 
 export const env = {
   revenueCatIosApiKey,
