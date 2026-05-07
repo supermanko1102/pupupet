@@ -50,6 +50,7 @@ export function usePhotoAnalysisFlow({ onLogsUpdated }: Props) {
 
   const [currentLogId, setCurrentLogId] = useState<string | null>(null);
   const [petAssigned, setPetAssigned] = useState(false);
+  const [isPreparingAnalysis, setIsPreparingAnalysis] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [capturedAsset, setCapturedAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [isPhotoModalVisible, setIsPhotoModalVisible] = useState(false);
@@ -262,39 +263,55 @@ export function usePhotoAnalysisFlow({ onLogsUpdated }: Props) {
   }, [assignPetMutation, currentLogId, onLogsUpdated]);
 
   const startScan = useCallback(async () => {
+    if (isPreparingAnalysis || isUploading) return;
+
     if (Platform.OS !== 'ios' && Platform.OS !== 'android') {
       Alert.alert('請使用手機拍照', '拍照分析建議使用 iPhone 或 Android App。');
       return;
     }
 
-    const canAnalyze = await billing.ensureCanAnalyze();
-    if (!canAnalyze) return;
+    setIsPreparingAnalysis(true);
 
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert('需要相機權限', '請先允許 App 使用相機。');
-      return;
+    try {
+      const canAnalyze = await billing.ensureCanAnalyze();
+      if (!canAnalyze) return;
+
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('需要相機權限', '請先允許 App 使用相機。');
+        return;
+      }
+    } finally {
+      setIsPreparingAnalysis(false);
     }
 
     const asset = firstPickedAsset(await ImagePicker.launchCameraAsync(PHOTO_PICKER_OPTIONS));
     if (!asset) return;
     void uploadAsset(asset);
-  }, [billing, uploadAsset]);
+  }, [billing, isPreparingAnalysis, isUploading, uploadAsset]);
 
   const pickFromLibrary = useCallback(async () => {
-    const canAnalyze = await billing.ensureCanAnalyze();
-    if (!canAnalyze) return;
+    if (isPreparingAnalysis || isUploading) return;
 
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert('需要相簿權限', '請先允許 App 存取相簿。');
-      return;
+    setIsPreparingAnalysis(true);
+
+    try {
+      const canAnalyze = await billing.ensureCanAnalyze();
+      if (!canAnalyze) return;
+
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('需要相簿權限', '請先允許 App 存取相簿。');
+        return;
+      }
+    } finally {
+      setIsPreparingAnalysis(false);
     }
 
     const asset = firstPickedAsset(await ImagePicker.launchImageLibraryAsync(PHOTO_PICKER_OPTIONS));
     if (!asset) return;
     void uploadAsset(asset);
-  }, [billing, uploadAsset]);
+  }, [billing, isPreparingAnalysis, isUploading, uploadAsset]);
 
   const canDismissProcessing =
     modalPhase === 'processing'
@@ -309,6 +326,7 @@ export function usePhotoAnalysisFlow({ onLogsUpdated }: Props) {
     capturedAsset,
     closePhotoModal,
     dismissProcessingModal,
+    isPreparingAnalysis,
     isUploading,
     isPhotoModalVisible,
     modalPhase,

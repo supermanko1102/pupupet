@@ -2,6 +2,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import {
+  ActivityIndicator,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -93,6 +94,8 @@ export default function HomeScreen() {
     : backgroundProgress >= 0.9
       ? '快好了，完成後會更新到最近狀態。'
       : '背景持續處理中，通常需要 10-30 秒。';
+  const isPreparingAnalysis = photoAnalysisFlow.isPreparingAnalysis;
+  const isAnalysisActionDisabled = isPreparingAnalysis || photoAnalysisFlow.isUploading || !user;
 
   return (
     <>
@@ -139,12 +142,18 @@ export default function HomeScreen() {
                 <Pressable
                   style={({ pressed }) => [styles.ctaCard, styles.ctaCardPrimary, pressed && styles.ctaCardPressed]}
                   onPress={handleStartScan}
-                  disabled={photoAnalysisFlow.isUploading || !user}>
+                  disabled={isAnalysisActionDisabled}>
                   <View style={styles.ctaIconWrap}>
-                    <Ionicons name="camera" size={28} color="#ffffff" />
+                    {isPreparingAnalysis ? (
+                      <ActivityIndicator color="#ffffff" />
+                    ) : (
+                      <Ionicons name="camera" size={28} color="#ffffff" />
+                    )}
                   </View>
-                  <Text style={styles.ctaCardTitle}>拍照分析</Text>
-                  <Text style={styles.ctaCardSub}>使用手機相機建立紀錄</Text>
+                  <Text style={styles.ctaCardTitle}>{isPreparingAnalysis ? '準備中' : '拍照分析'}</Text>
+                  <Text style={styles.ctaCardSub}>
+                    {isPreparingAnalysis ? '正在確認分析額度' : '使用手機相機建立紀錄'}
+                  </Text>
                 </Pressable>
               </View>
 
@@ -152,9 +161,15 @@ export default function HomeScreen() {
                 android_ripple={Ripple.onLight}
                 style={({ pressed }) => [styles.libraryButton, pressed && styles.buttonPressed]}
                 onPress={handlePickFromLibrary}
-                disabled={photoAnalysisFlow.isUploading || !user}>
-                <Ionicons name="images-outline" size={16} color="#6c7a78" />
-                <Text style={styles.libraryButtonText}>從相簿補一筆</Text>
+                disabled={isAnalysisActionDisabled}>
+                {isPreparingAnalysis ? (
+                  <ActivityIndicator color="#6c7a78" size="small" />
+                ) : (
+                  <Ionicons name="images-outline" size={16} color="#6c7a78" />
+                )}
+                <Text style={styles.libraryButtonText}>
+                  {isPreparingAnalysis ? '正在準備' : '從相簿補一筆'}
+                </Text>
               </Pressable>
 
               {showBackgroundAnalysisCard && (
