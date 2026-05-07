@@ -59,8 +59,10 @@
     "@types/react": "~19.1.0",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~55.0.0",
+    "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react-native": "^5.0.0",
     "eslint-plugin-unused-imports": "^4.4.1",
+    "prettier": "^3.8.3",
     "typescript": "~5.9.2",
     "vitest": "^4.1.5"
   },

@@ -16,6 +16,31 @@ export class AppleSignInCanceledError extends Error {
   }
 }
 
+type FunctionErrorBody = {
+  code?: string;
+  error?: string;
+};
+
+async function readFunctionError(error: unknown) {
+  const context =
+    error && typeof error === 'object' && 'context' in error
+      ? (error as { context?: unknown }).context
+      : null;
+
+  if (typeof Response !== 'undefined' && context instanceof Response) {
+    const body = (await context
+      .clone()
+      .json()
+      .catch(() => null)) as FunctionErrorBody | null;
+
+    if (body?.error) {
+      return new Error(body.error);
+    }
+  }
+
+  return error instanceof Error ? error : new Error('請求失敗。');
+}
+
 export async function signInWithApple(): Promise<void> {
   if (!supabase) {
     throw new Error('Supabase 尚未設定完成。');
@@ -64,5 +89,24 @@ export async function signInWithApple(): Promise<void> {
         given_name: credential.fullName.givenName,
       },
     });
+  }
+}
+
+export async function deleteCurrentAccount(): Promise<void> {
+  if (!supabase) {
+    throw new Error('Supabase 尚未設定完成。');
+  }
+
+  const { error } = await supabase.functions.invoke('delete-account', {
+    body: {},
+  });
+
+  if (error) {
+    throw await readFunctionError(error);
+  }
+
+  const { error: signOutError } = await supabase.auth.signOut({ scope: 'local' });
+  if (signOutError) {
+    console.warn('Local sign out after account deletion failed:', signOutError);
   }
 }
