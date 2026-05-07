@@ -10,6 +10,8 @@ export { useHistoryLogs, useHistoryLogsForDate } from './logs/use-history-logs';
 
 export { usePoopLog } from './logs/use-poop-log';
 
+export { useDeletePoopLog } from './logs/use-delete-poop-log';
+
 export { useStats } from './logs/use-stats';
 
 export { useTrendSummary } from './logs/use-trend-summary';

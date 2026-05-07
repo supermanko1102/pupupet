@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   RefreshControl,
   SectionList,
   StyleSheet,
@@ -13,13 +14,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { HistoryHeader } from '@/components/history/header';
 import { HistoryEmptyRecords } from '@/components/history/history-empty-records';
-import { HistoryLogCard } from '@/components/history/history-log-card';
+import { SwipeableHistoryLogCard } from '@/components/history/swipeable-history-log-card';
 import { Surface } from '@/constants/theme';
 import {
+  useDeletePoopLog,
   useHistoryLogs,
   useHistoryLogsForDate,
   useStats,
   useTrendSummary,
+  type HistoryLog,
 } from '@/hooks/use-poop-logs';
 import {
   buildCurrentMonthDays,
@@ -36,6 +39,8 @@ export default function HistoryScreen() {
   const [rangeKey, setRangeKey] = useState<RangeKey>('7d');
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [abnormalOnly, setAbnormalOnly] = useState(false);
+  const [deletingLogId, setDeletingLogId] = useState<string | null>(null);
+  const deletePoopLog = useDeletePoopLog();
 
   const {
     data,
@@ -102,6 +107,30 @@ export default function HistoryScreen() {
     setAbnormalOnly(false);
   }
 
+  function handleDeleteLog(log: HistoryLog) {
+    Alert.alert(
+      '刪除這筆紀錄',
+      '刪除後，這張照片、AI 分析結果與相關追蹤提醒都會移除。此操作無法復原。',
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '刪除',
+          style: 'destructive',
+          onPress: async () => {
+            setDeletingLogId(log.id);
+            try {
+              await deletePoopLog.mutateAsync(log.id);
+            } catch (err) {
+              Alert.alert('刪除失敗', err instanceof Error ? err.message : '請稍後再試。');
+            } finally {
+              setDeletingLogId(null);
+            }
+          },
+        },
+      ],
+    );
+  }
+
   if (showInitialLoading) {
     return (
       <SafeAreaView style={styles.screen} edges={['bottom']}>
@@ -131,7 +160,12 @@ export default function HistoryScreen() {
           sections={sections}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
-            <HistoryLogCard log={item} onPress={() => router.push(`/logs/${item.id}` as never)} />
+            <SwipeableHistoryLogCard
+              isDeleting={deletingLogId === item.id}
+              log={item}
+              onDelete={handleDeleteLog}
+              onPress={() => router.push(`/logs/${item.id}` as never)}
+            />
           )}
           renderSectionHeader={({ section }) => (
             <View style={styles.sectionHeader}>

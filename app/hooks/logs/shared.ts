@@ -211,3 +211,39 @@ export async function fetchDoneLogSignals(limit?: number): Promise<LogSignal[]> 
 
   return (data ?? []) as LogSignal[];
 }
+
+type FunctionErrorBody = {
+  code?: string;
+  error?: string;
+};
+
+async function readFunctionError(error: unknown) {
+  const context = error && typeof error === 'object' && 'context' in error
+    ? (error as { context?: unknown }).context
+    : null;
+
+  if (typeof Response !== 'undefined' && context instanceof Response) {
+    const body = await context.clone().json().catch(() => null) as FunctionErrorBody | null;
+
+    if (body?.code === 'log_not_deletable') {
+      return new Error('分析中暫時無法刪除。');
+    }
+
+    if (body?.error) {
+      return new Error(body.error);
+    }
+  }
+
+  return error instanceof Error ? error : new Error('刪除紀錄失敗。');
+}
+
+export async function deletePoopLog(logId: string): Promise<void> {
+  const client = requireSupabase();
+  const { error } = await client.functions.invoke('delete-poop-log', {
+    body: { logId },
+  });
+
+  if (error) {
+    throw await readFunctionError(error);
+  }
+}
