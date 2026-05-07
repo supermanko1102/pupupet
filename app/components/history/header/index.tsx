@@ -1,5 +1,7 @@
-import { StyleSheet, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { StyleSheet, Text, View } from 'react-native';
 
+import { Surface } from '@/constants/theme';
 import type { DayMetric, RangeKey, RangeSummary, TrendSummaryLike } from '@/lib/logs/history-metrics';
 
 import { DailyBars } from './daily-bars';
@@ -53,10 +55,22 @@ export function HistoryHeader({
         onClearDate={onClearDate}
       />
       <FilterRow abnormalOnly={abnormalOnly} onToggleAbnormalOnly={onToggleAbnormalOnly} />
+      <View style={styles.swipeHint}>
+        <Ionicons name="chevron-back-outline" size={14} color={Surface.mutedSoft} />
+        <Text style={styles.swipeHintText}>左滑完成或失敗的紀錄可刪除</Text>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  swipeHint: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 5,
+    justifyContent: 'center',
+    marginTop: -2,
+  },
+  swipeHintText: { color: Surface.mutedSoft, fontSize: 12, fontWeight: '600' },
   wrap: { gap: 14, paddingBottom: 6, paddingHorizontal: 20, paddingTop: 12 },
 });
