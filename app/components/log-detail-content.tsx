@@ -41,6 +41,7 @@ export function LogDetailContent({
 }: Props) {
   const isFollowUp = variant === 'follow-up';
   const isFailed = log.status === 'failed';
+  const isPending = log.status !== 'done' && !isFailed;
   const failureReason = normalizeFailureReason(log.failureReason);
   const failure = failureCopy(failureReason);
 
@@ -55,7 +56,15 @@ export function LogDetailContent({
       )}
 
       <View style={ms.resultBody}>
-        {isFailed ? (
+        {isPending ? (
+          <View style={styles.pendingBox}>
+            <View style={styles.pendingIconWrap}>
+              <ActivityIndicator color="#20B2AA" />
+            </View>
+            <Text style={styles.pendingTitle}>分析仍在進行中</Text>
+            <Text style={styles.pendingSubtitle}>AI 正在處理這張照片，完成後歷程會自動更新結果。</Text>
+          </View>
+        ) : isFailed ? (
           <View style={styles.failureBox}>
             <View style={styles.failureIconWrap}>
               <Ionicons name={failure.icon} size={24} color={failure.iconColor} />
@@ -86,14 +95,14 @@ export function LogDetailContent({
           </View>
         ) : null}
 
-        {!isFailed && log.recommendation ? (
+        {!isPending && !isFailed && log.recommendation ? (
           <View style={ms.recommendBox}>
             <Text style={ms.recommendLabel}>建議</Text>
             <Text style={ms.recommendText}>{log.recommendation}</Text>
           </View>
         ) : null}
 
-        {isFailed ? null : log.petId ? (
+        {isPending || isFailed ? null : log.petId ? (
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>寵物</Text>
             <Text style={styles.infoValue}>{log.petName}</Text>
@@ -190,6 +199,26 @@ export function LogDetailModal({ log, ...rest }: ModalProps) {
 
 const styles = StyleSheet.create({
   imageFallback: { alignItems: 'center', backgroundColor: Surface.bgMuted, justifyContent: 'center' },
+
+  pendingBox: {
+    alignItems: 'center',
+    backgroundColor: Surface.bgSoft,
+    borderColor: Surface.border,
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 10,
+    padding: 18,
+  },
+  pendingIconWrap: {
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 999,
+    height: 50,
+    justifyContent: 'center',
+    width: 50,
+  },
+  pendingTitle: { color: Surface.ink, fontSize: 18, fontWeight: '800', textAlign: 'center' },
+  pendingSubtitle: { color: Surface.muted, fontSize: 14, lineHeight: 21, textAlign: 'center' },
 
   failureBox: {
     alignItems: 'center',

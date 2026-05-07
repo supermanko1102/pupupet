@@ -213,13 +213,23 @@ export function PhotoAnalysisModal({
                     <Text style={styles.petPickerDone}>✓ 已分類</Text>
                   ) : (
                     <>
-                      <Text style={styles.petPickerTitle}>這是哪一隻的紀錄？</Text>
-                      <PetPicker pets={pets} onSelect={handleAssignPet} />
+                      <Text style={styles.petPickerTitle}>
+                        {pets.length > 0 ? '這是哪一隻的紀錄？' : '尚未建立寵物檔案'}
+                      </Text>
+                      {pets.length > 0 ? (
+                        <PetPicker pets={pets} onSelect={handleAssignPet} />
+                      ) : (
+                        <Text style={styles.petPickerEmpty}>
+                          你可以先完成這筆紀錄，之後到寵物管理新增檔案再分類。
+                        </Text>
+                      )}
                       <Pressable
                         android_ripple={Ripple.onLight}
                         style={({ pressed }) => [styles.petPickerSkipButton, pressed && styles.buttonPressed]}
                         onPress={handleClose}>
-                        <Text style={styles.petPickerSkip}>略過，之後再分類</Text>
+                        <Text style={styles.petPickerSkip}>
+                          {pets.length > 0 ? '略過，之後再分類' : '完成'}
+                        </Text>
                       </Pressable>
                     </>
                   )}
@@ -461,8 +471,18 @@ const styles = StyleSheet.create({
   petPickerTitle: {
     color: Surface.muted, fontSize: 13, fontWeight: '600', letterSpacing: 0.4, textTransform: 'uppercase',
   },
-  petPickerSkipButton: { borderRadius: 999, overflow: 'hidden', paddingVertical: 8 },
-  petPickerSkip:  { color: Surface.hairline, fontSize: 14, textAlign: 'center' },
+  petPickerEmpty: { color: Surface.inkSoft, fontSize: 14, lineHeight: 20 },
+  petPickerSkipButton: {
+    alignItems: 'center',
+    backgroundColor: Surface.bgMuted,
+    borderRadius: 14,
+    minHeight: 44,
+    justifyContent: 'center',
+    overflow: 'hidden',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  petPickerSkip:  { color: Surface.inkSoft, fontSize: 14, fontWeight: '700', textAlign: 'center' },
   petPickerDone:  { color: '#16a34a', fontSize: 14, fontWeight: '600', textAlign: 'center' },
   modalButton:    { overflow: 'hidden' },
   buttonPressed:  { opacity: 0.72 },

@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { settingsRouteStyles as shared } from '@/components/settings/route-shared';
@@ -52,7 +52,7 @@ export default function SettingsAccountScreen() {
 
     Alert.alert(
       '刪除帳號',
-      '這會永久刪除你的帳號、寵物資料、便便紀錄、分析結果與已上傳照片。此操作無法復原。',
+      '這會永久刪除你的帳號、寵物資料、便便紀錄、分析結果與已上傳照片。此操作無法復原。如已訂閱 Plus，刪除帳號不會自動取消 App Store 訂閱。',
       [
         { text: '取消', style: 'cancel' },
         { text: '刪除帳號', style: 'destructive', onPress: () => void deleteAccount() },
@@ -74,26 +74,44 @@ export default function SettingsAccountScreen() {
           <Ionicons name="log-out-outline" size={18} color="#9a3412" />
           <Text style={styles.signOutText}>登出</Text>
         </Pressable>
-        <Pressable
-          style={[styles.deleteButton, isDeletingAccount && styles.disabled]}
-          onPress={handleDeleteAccount}
-          disabled={isDeletingAccount}
-        >
-          {isDeletingAccount ? (
-            <ActivityIndicator color="#991b1b" size="small" />
-          ) : (
-            <Ionicons name="trash-outline" size={18} color="#991b1b" />
-          )}
-          <Text style={styles.deleteButtonText}>
-            {isDeletingAccount ? '刪除中' : '永久刪除帳號'}
+        <View style={styles.deleteSection}>
+          <Text style={styles.deleteDescription}>
+            刪除後，寵物資料、排便紀錄、AI 分析結果與已上傳照片都會從系統移除。
           </Text>
-        </Pressable>
+          <Text style={styles.deleteWarning}>
+            如已訂閱 Plus，請至 App Store 訂閱管理取消；刪除帳號不會自動停止扣款。
+          </Text>
+          <Pressable
+            style={[styles.deleteButton, isDeletingAccount && styles.disabled]}
+            onPress={handleDeleteAccount}
+            disabled={isDeletingAccount}
+          >
+            {isDeletingAccount ? (
+              <ActivityIndicator color="#991b1b" size="small" />
+            ) : (
+              <Ionicons name="trash-outline" size={18} color="#991b1b" />
+            )}
+            <Text style={styles.deleteButtonText}>
+              {isDeletingAccount ? '刪除中' : '永久刪除帳號'}
+            </Text>
+          </Pressable>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  deleteSection: {
+    backgroundColor: '#fff7ed',
+    borderColor: '#fed7aa',
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 10,
+    padding: 14,
+  },
+  deleteDescription: { color: '#7c2d12', fontSize: 13, lineHeight: 19 },
+  deleteWarning: { color: '#9a3412', fontSize: 13, fontWeight: '700', lineHeight: 19 },
   deleteButton: {
     alignItems: 'center',
     backgroundColor: '#fee2e2',

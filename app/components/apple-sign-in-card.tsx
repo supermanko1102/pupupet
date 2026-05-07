@@ -1,5 +1,6 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -53,7 +54,7 @@ export function AppleSignInCard() {
         onPress={() => void handleSignIn()}>
         <MaterialCommunityIcons color="#171D1D" name="apple" size={24} />
         <Text style={styles.buttonText}>
-          {showCheckingState ? 'Checking Apple Sign In' : 'Continue with Apple'}
+          {showCheckingState ? '正在檢查 Apple 登入' : '使用 Apple 登入'}
         </Text>
         {isLoading ? (
           <View pointerEvents="none" style={styles.loadingOverlay}>
@@ -77,7 +78,11 @@ export function AppleSignInCard() {
       ) : null}
 
       <Text style={styles.legalText}>
-        By continuing, you agree to our Terms of Service and Privacy Policy.
+        繼續即表示你同意
+        <Text style={styles.legalLink} onPress={() => router.push('/legal/terms' as never)}>使用條款</Text>
+        與
+        <Text style={styles.legalLink} onPress={() => router.push('/legal/privacy' as never)}>隱私政策</Text>
+        。
       </Text>
     </View>
   );
@@ -127,6 +132,11 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     marginTop: 32,
     textAlign: 'center',
+  },
+  legalLink: {
+    color: '#167f79',
+    fontWeight: '700',
+    textDecorationLine: 'underline',
   },
   loadingOverlay: {
     alignItems: 'center',
