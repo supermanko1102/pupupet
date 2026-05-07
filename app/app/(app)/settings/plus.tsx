@@ -83,7 +83,7 @@ export default function PlusScreen() {
             ) : (
               <>
                 <Ionicons name="card-outline" size={18} color="#ffffff" />
-                <Text style={styles.primaryButtonText}>{billing.isPlusActive ? '管理訂閱方案' : '訂閱 NT$99/月'}</Text>
+                <Text style={styles.primaryButtonText}>{billing.isPlusActive ? '管理訂閱方案' : '訂閱 NT$120/月'}</Text>
               </>
             )}
           </Pressable>
