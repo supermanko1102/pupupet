@@ -9,10 +9,7 @@
     "test": "vitest run",
     "web": "expo start --web",
     "lint": "expo lint",
-    "eas:configure": "eas build:configure",
-    "eas:ios:dev": "eas build --profile development --platform ios",
-    "eas:ios:sim": "eas build --profile simulator --platform ios",
-    "eas:ios:sim:run": "eas build:run --platform ios"
+    "eas:update:prod": "eas update --branch production --environment production"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
