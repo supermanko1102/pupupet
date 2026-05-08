@@ -44,8 +44,13 @@ const BillingContext = createContext<BillingContextValue>({
 function isPurchaseCancelledError(error: unknown) {
   if (!error || typeof error !== 'object') return false;
 
-  const purchaseError = error as { code?: unknown; userCancelled?: unknown };
-  return purchaseError.userCancelled === true || purchaseError.code === PURCHASES_ERROR_CODE.PURCHASE_CANCELLED_ERROR;
+  const e = error as { code?: unknown; userCancelled?: unknown; userInfo?: { readableErrorCode?: unknown } };
+
+  if (e.userCancelled === true) return true;
+  if (String(e.code) === PURCHASES_ERROR_CODE.PURCHASE_CANCELLED_ERROR) return true;
+  if (e.userInfo?.readableErrorCode === 'PURCHASE_CANCELLED') return true;
+
+  return false;
 }
 
 function findPlusMonthlyPackage(packages: PurchasesPackage[]) {

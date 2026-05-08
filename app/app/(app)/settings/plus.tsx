@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { settingsRouteStyles as s } from '@/components/settings/route-shared';
@@ -16,6 +16,9 @@ function formatDate(value: string | null | undefined) {
     year: 'numeric',
   });
 }
+
+const TERMS_URL = 'https://pupupet.vercel.app/terms';
+const PRIVACY_URL = 'https://pupupet.vercel.app/privacy';
 
 export default function PlusScreen() {
   const billing = useBilling();
@@ -97,9 +100,38 @@ export default function PlusScreen() {
           </Pressable>
         </View>
 
-        <Text style={styles.note}>
-          取消訂閱後，到期日前仍可使用本期剩餘額度；到期後仍可查看歷史紀錄。
-        </Text>
+        <View style={styles.disclosure}>
+          <Text style={styles.disclosureTitle}>訂閱方案說明</Text>
+          <Text style={styles.disclosureItem}>• 方案名稱：PupuPet Plus 月訂閱</Text>
+          <Text style={styles.disclosureItem}>• 訂閱期間：1 個月（自動續訂）</Text>
+          <Text style={styles.disclosureItem}>• 價格：NT$120 / 月</Text>
+          <Text style={styles.disclosureItem}>
+            • 訂閱會自動續訂，除非在當期到期前至少 24 小時關閉自動續訂。
+          </Text>
+          <Text style={styles.disclosureItem}>
+            • 您的 Apple ID 帳戶將於當期結束前 24 小時內收取續訂費用。
+          </Text>
+          <Text style={styles.disclosureItem}>
+            • 可隨時於 App Store 帳戶設定中管理或取消訂閱，取消會於當期結束時生效。
+          </Text>
+          <Text style={styles.disclosureItem}>
+            • 取消訂閱後，到期日前仍可使用本期剩餘額度；到期後仍可查看歷史紀錄。
+          </Text>
+        </View>
+
+        <View style={styles.legalLinks}>
+          <Pressable
+            onPress={() => void Linking.openURL(TERMS_URL)}
+            hitSlop={8}>
+            <Text style={styles.legalLink}>使用條款（EULA）</Text>
+          </Pressable>
+          <Text style={styles.legalDivider}>·</Text>
+          <Pressable
+            onPress={() => void Linking.openURL(PRIVACY_URL)}
+            hitSlop={8}>
+            <Text style={styles.legalLink}>隱私權政策</Text>
+          </Pressable>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -136,7 +168,38 @@ const styles = StyleSheet.create({
   },
   metricRowLast: { borderBottomWidth: 0 },
   metricValue: { color: Surface.ink, fontSize: 15, fontWeight: '700' },
-  note: { color: Surface.muted, fontSize: 13, lineHeight: 20, paddingHorizontal: 4, textAlign: 'center' },
+  disclosure: {
+    backgroundColor: Surface.bgSoft,
+    borderRadius: 12,
+    gap: 6,
+    marginTop: 8,
+    padding: 14,
+  },
+  disclosureTitle: {
+    color: Surface.ink,
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  disclosureItem: {
+    color: Surface.muted,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  legalLinks: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    paddingVertical: 4,
+  },
+  legalLink: {
+    color: Brand.primary,
+    fontSize: 13,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
+  },
+  legalDivider: { color: Surface.muted, fontSize: 13 },
   primaryButton: {
     alignItems: 'center',
     backgroundColor: Brand.primary,
