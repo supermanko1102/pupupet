@@ -3,7 +3,7 @@ import Purchases, { LOG_LEVEL } from 'react-native-purchases';
 
 import { env } from '@/lib/env';
 
-const PLUS_MONTHLY_PRODUCT_ID = 'pupupet_plus_monthly_v1';
+export const PLUS_MONTHLY_PRODUCT_ID = 'pupupet_plus_monthly_v1';
 
 let configuredRevenueCatUserId: string | null = null;
 let revenueCatConfigureInFlight: Promise<void> | null = null;

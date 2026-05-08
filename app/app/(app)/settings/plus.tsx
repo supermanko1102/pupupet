@@ -77,7 +77,7 @@ export default function PlusScreen() {
           <Pressable
             style={({ pressed }) => [styles.primaryButton, pressed && styles.buttonPressed]}
             disabled={isBusy}
-            onPress={() => void billing.showPaywall()}>
+            onPress={() => void (billing.isPlusActive ? billing.manageSubscription() : billing.purchasePlus())}>
             {isBusy ? (
               <ActivityIndicator color="#ffffff" />
             ) : (

@@ -1,11 +1,11 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PropsWithChildren, createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { Alert } from 'react-native';
-import Purchases from 'react-native-purchases';
-import RevenueCatUI, { PAYWALL_RESULT } from 'react-native-purchases-ui';
+import { Alert, Linking } from 'react-native';
+import Purchases, { PACKAGE_TYPE, PURCHASES_ERROR_CODE } from 'react-native-purchases';
+import type { PurchasesPackage } from 'react-native-purchases';
 
 import { BILLING_ACCOUNT_SELECT, BillingAccount, SyncBillingResponse, evaluateAnalysisAccess, isActiveSubscription, remainingAnalysesFor } from '@/lib/billing';
-import { canUseRevenueCatPurchases, configurePurchasesForUser, logRevenueCatProductDiagnostics } from '@/lib/billing/revenuecat';
+import { PLUS_MONTHLY_PRODUCT_ID, canUseRevenueCatPurchases, configurePurchasesForUser, logRevenueCatProductDiagnostics } from '@/lib/billing/revenuecat';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/providers/session-provider';
 
@@ -19,10 +19,11 @@ type BillingContextValue = {
   isPlusActive: boolean;
   isRevenueCatReady: boolean;
   isSyncing: boolean;
+  manageSubscription: () => Promise<void>;
+  purchasePlus: () => Promise<boolean>;
   refreshBilling: () => Promise<BillingAccount | null>;
   remainingAnalyses: number;
   restorePurchases: () => Promise<void>;
-  showPaywall: () => Promise<boolean>;
 };
 
 const BillingContext = createContext<BillingContextValue>({
@@ -33,11 +34,28 @@ const BillingContext = createContext<BillingContextValue>({
   isPlusActive: false,
   isRevenueCatReady: false,
   isSyncing: false,
+  manageSubscription: async () => {},
+  purchasePlus: async () => false,
   refreshBilling: async () => null,
   remainingAnalyses: 0,
   restorePurchases: async () => {},
-  showPaywall: async () => false,
 });
+
+function isPurchaseCancelledError(error: unknown) {
+  if (!error || typeof error !== 'object') return false;
+
+  const purchaseError = error as { code?: unknown; userCancelled?: unknown };
+  return purchaseError.userCancelled === true || purchaseError.code === PURCHASES_ERROR_CODE.PURCHASE_CANCELLED_ERROR;
+}
+
+function findPlusMonthlyPackage(packages: PurchasesPackage[]) {
+  return (
+    packages.find((revenueCatPackage) => revenueCatPackage.product.identifier === PLUS_MONTHLY_PRODUCT_ID)
+    ?? packages.find((revenueCatPackage) => revenueCatPackage.packageType === PACKAGE_TYPE.MONTHLY)
+    ?? packages.find((revenueCatPackage) => revenueCatPackage.product.subscriptionPeriod === 'P1M')
+    ?? null
+  );
+}
 
 async function fetchBillingAccount(userId: string) {
   if (!supabase) return null;
@@ -115,7 +133,7 @@ export function BillingProvider({ children }: PropsWithChildren) {
     }
   }, [queryClient, user]);
 
-  const showPaywall = useCallback(async () => {
+  const purchasePlus = useCallback(async () => {
     if (!canPurchase || !isRevenueCatReady) {
       Alert.alert('訂閱尚未設定', '目前僅支援 iOS 訂閱，且需要設定 RevenueCat API key。');
       return false;
@@ -123,11 +141,22 @@ export function BillingProvider({ children }: PropsWithChildren) {
 
     await logRevenueCatProductDiagnostics();
 
-    const result = await RevenueCatUI.presentPaywall({
-      displayCloseButton: true,
-    });
+    setIsSyncing(true);
+    try {
+      const offerings = await Purchases.getOfferings();
+      const currentPackages = offerings.current?.availablePackages ?? [];
+      const plusPackage = findPlusMonthlyPackage(currentPackages);
 
-    if (result === PAYWALL_RESULT.PURCHASED || result === PAYWALL_RESULT.RESTORED) {
+      if (!plusPackage) {
+        Alert.alert(
+          '找不到訂閱商品',
+          `請確認 RevenueCat current offering 已設定 ${PLUS_MONTHLY_PRODUCT_ID} 月訂閱商品。`
+        );
+        return false;
+      }
+
+      await Purchases.purchasePackage(plusPackage);
+
       try {
         const account = await refreshBilling();
         return remainingAnalysesFor(account) > 0;
@@ -136,10 +165,39 @@ export function BillingProvider({ children }: PropsWithChildren) {
         Alert.alert('訂閱已完成，狀態同步失敗', error instanceof Error ? error.message : '請稍後再試，或聯絡客服協助同步。');
         return false;
       }
+    } catch (error) {
+      if (isPurchaseCancelledError(error)) return false;
+
+      Alert.alert('訂閱失敗', error instanceof Error ? error.message : '請稍後再試。');
+      return false;
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [canPurchase, isRevenueCatReady, refreshBilling]);
+
+  const manageSubscription = useCallback(async () => {
+    if (!canPurchase || !isRevenueCatReady) {
+      Alert.alert('訂閱尚未設定', '目前僅支援 iOS 訂閱，且需要設定 RevenueCat API key。');
+      return;
     }
 
-    return false;
-  }, [canPurchase, isRevenueCatReady, refreshBilling]);
+    setIsSyncing(true);
+    try {
+      const customerInfo = await Purchases.getCustomerInfo();
+      const managementURL = customerInfo.managementURL;
+
+      if (!managementURL) {
+        Alert.alert('找不到訂閱管理連結', '請至 App Store 帳號設定中的「訂閱項目」管理 PupuPet Plus。');
+        return;
+      }
+
+      await Linking.openURL(managementURL);
+    } catch (error) {
+      Alert.alert('無法開啟訂閱管理', error instanceof Error ? error.message : '請稍後再試。');
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [canPurchase, isRevenueCatReady]);
 
   const ensureCanAnalyze = useCallback(async () => {
     if (!user) return false;
@@ -167,9 +225,9 @@ export function BillingProvider({ children }: PropsWithChildren) {
     }
 
     // 3) 還是 free_exhausted → 引導付費
-    if (await showPaywall()) return true;
+    if (await purchasePlus()) return true;
     return false;
-  }, [billingQuery.data, refreshBilling, showPaywall, user]);
+  }, [billingQuery.data, purchasePlus, refreshBilling, user]);
 
   const restorePurchases = useCallback(async () => {
     if (!canPurchase || !isRevenueCatReady) {
@@ -197,10 +255,11 @@ export function BillingProvider({ children }: PropsWithChildren) {
     isPlusActive: isActiveSubscription(billingQuery.data ?? null),
     isRevenueCatReady,
     isSyncing,
+    manageSubscription,
+    purchasePlus,
     refreshBilling,
     remainingAnalyses: remainingAnalysesFor(billingQuery.data ?? null),
     restorePurchases,
-    showPaywall,
   }), [
     billingQuery.data,
     billingQuery.isLoading,
@@ -208,9 +267,10 @@ export function BillingProvider({ children }: PropsWithChildren) {
     ensureCanAnalyze,
     isRevenueCatReady,
     isSyncing,
+    manageSubscription,
+    purchasePlus,
     refreshBilling,
     restorePurchases,
-    showPaywall,
   ]);
 
   return (
