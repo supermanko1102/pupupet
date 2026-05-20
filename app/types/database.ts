@@ -184,6 +184,12 @@ export type Database = {
       poop_logs: {
         Row: {
           ai_raw_json: Json | null
+          ai_escalation_signs: string[]
+          ai_findings: string[]
+          ai_next_step: string | null
+          ai_observation: string | null
+          ai_possible_reasons: string[]
+          ai_watch_items: string[]
           bristol_score: number | null
           captured_at: string
           color: string | null
@@ -197,13 +203,18 @@ export type Database = {
           note: string | null
           pet_id: string | null
           recommendation: string | null
-          risk_level: string | null
           status: string
           summary: string | null
           user_id: string
         }
         Insert: {
           ai_raw_json?: Json | null
+          ai_escalation_signs?: string[]
+          ai_findings?: string[]
+          ai_next_step?: string | null
+          ai_observation?: string | null
+          ai_possible_reasons?: string[]
+          ai_watch_items?: string[]
           bristol_score?: number | null
           captured_at?: string
           color?: string | null
@@ -217,13 +228,18 @@ export type Database = {
           note?: string | null
           pet_id?: string | null
           recommendation?: string | null
-          risk_level?: string | null
           status?: string
           summary?: string | null
           user_id?: string
         }
         Update: {
           ai_raw_json?: Json | null
+          ai_escalation_signs?: string[]
+          ai_findings?: string[]
+          ai_next_step?: string | null
+          ai_observation?: string | null
+          ai_possible_reasons?: string[]
+          ai_watch_items?: string[]
           bristol_score?: number | null
           captured_at?: string
           color?: string | null
@@ -237,7 +253,6 @@ export type Database = {
           note?: string | null
           pet_id?: string | null
           recommendation?: string | null
-          risk_level?: string | null
           status?: string
           summary?: string | null
           user_id?: string

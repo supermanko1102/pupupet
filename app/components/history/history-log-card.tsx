@@ -50,8 +50,8 @@ export function HistoryLogCard({ log, onPress }: { log: HistoryLog; onPress: () 
         </View>
         {log.note ? (
           <Text style={styles.cardSummary} numberOfLines={1}>{log.note}</Text>
-        ) : log.summary ? (
-          <Text style={styles.cardSummary} numberOfLines={2}>{log.summary}</Text>
+        ) : log.aiObservation || log.summary ? (
+          <Text style={styles.cardSummary} numberOfLines={2}>{log.aiObservation ?? log.summary}</Text>
         ) : null}
       </View>
     </Pressable>

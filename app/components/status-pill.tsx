@@ -4,7 +4,6 @@ import { StatusColors } from '@/constants/theme';
 import type { LogTone } from '@/lib/logs/log-utils';
 
 const TONE_COLORS: Record<LogTone, { bg: string; text: string }> = {
-  danger:  { bg: StatusColors.vet.bg,     text: StatusColors.vet.text },
   neutral: { bg: StatusColors.neutral.bg, text: StatusColors.neutral.text },
   success: { bg: StatusColors.normal.bg,  text: StatusColors.normal.text },
   warning: { bg: StatusColors.observe.bg, text: StatusColors.observe.text },

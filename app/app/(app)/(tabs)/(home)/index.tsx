@@ -28,7 +28,7 @@ import { useSession } from '@/providers/session-provider';
 const BACKGROUND_STEP_COPY = {
   uploading: '正在上傳照片',
   creating: '正在建立紀錄',
-  analyzing: 'AI 分析中',
+  analyzing: 'AI 觀察中',
   finalizing: '正在整理結果',
 } as const;
 
@@ -86,12 +86,12 @@ export default function HomeScreen() {
   const backgroundTitle = backgroundAnalysisDone
     ? backgroundAnalysisFailed
       ? backgroundFailureTitle(backgroundFailureReason)
-      : '分析完成'
+      : '觀察完成'
     : BACKGROUND_STEP_COPY[photoAnalysisFlow.processingStep];
   const backgroundSubtitle = backgroundAnalysisDone
     ? backgroundAnalysisFailed
       ? backgroundFailureSubtitle(backgroundFailureReason)
-      : '結果已準備好，點開即可查看。'
+      : 'AI 觀察已準備好，點開即可查看。'
     : backgroundProgress >= 0.9
       ? '快好了，完成後會更新到最近狀態。'
       : '背景持續處理中，通常需要 10-30 秒。';
@@ -115,6 +115,7 @@ export default function HomeScreen() {
         onDismissProcessing={photoAnalysisFlow.dismissProcessingModal}
         onPickPhoto={handlePickFromLibrary}
         onRetake={handleStartScan}
+        onScheduleFollowUp={photoAnalysisFlow.scheduleCurrentFollowUp}
       />
 
       <LinearGradient
@@ -137,7 +138,7 @@ export default function HomeScreen() {
               >
                 <View style={styles.heroSection}>
                   <Text style={styles.heroTitle}>今天記一下</Text>
-                  <Text style={styles.heroSubtitle}>拍照分析健康狀況</Text>
+                  <Text style={styles.heroSubtitle}>拍照留下 AI 觀察</Text>
                 </View>
 
                 <View style={styles.ctaRow}>
@@ -158,7 +159,7 @@ export default function HomeScreen() {
                       )}
                     </View>
                     <Text style={styles.ctaCardTitle}>
-                      {isPreparingAnalysis ? '準備中' : '拍照分析'}
+                      {isPreparingAnalysis ? '準備中' : '拍照觀察'}
                     </Text>
                     <Text style={styles.ctaCardSub}>
                       {isPreparingAnalysis ? '正在確認分析額度' : '使用手機相機建立紀錄'}

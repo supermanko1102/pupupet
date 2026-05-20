@@ -6,13 +6,13 @@ import { lightImpactFeedback } from '@/lib/haptics';
 import { formatDateKeyLabel } from '@/lib/logs/history-metrics';
 
 export function RecordsToolbar({
-  abnormalOnly,
   selectedDate,
   onClearDate,
+  watchOnly,
 }: {
-  abnormalOnly: boolean;
   selectedDate: string | null;
   onClearDate: () => void;
+  watchOnly: boolean;
 }) {
   function handleClearDate() {
     lightImpactFeedback();
@@ -23,7 +23,7 @@ export function RecordsToolbar({
     <View style={styles.toolbar}>
       <View style={styles.titleBlock}>
         <Text style={styles.title}>
-          {selectedDate ? `${formatDateKeyLabel(selectedDate)}紀錄` : abnormalOnly ? '最近異常' : '最近紀錄'}
+          {selectedDate ? `${formatDateKeyLabel(selectedDate)}紀錄` : watchOnly ? '需要留意' : '最近紀錄'}
         </Text>
         <Text style={styles.subtitle}>
           {selectedDate ? '日期詳情' : '依時間排序'}

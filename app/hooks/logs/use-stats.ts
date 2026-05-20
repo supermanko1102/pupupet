@@ -6,11 +6,9 @@ import { fetchDoneLogSignals, poopLogsKeys } from './shared';
 import type { LogSignal } from './shared';
 
 type StatsData = {
-  total: number;
-  normal: number;
-  observe: number;
-  vet: number;
   rows: LogSignal[];
+  total: number;
+  watchItemCount: number;
 };
 
 export function useStats() {
@@ -24,11 +22,12 @@ export function useStats() {
       const rows = await fetchDoneLogSignals();
 
       return {
-        total: rows.length,
-        normal: rows.filter((r) => r.risk_level === 'normal').length,
-        observe: rows.filter((r) => r.risk_level === 'observe').length,
-        vet: rows.filter((r) => r.risk_level === 'vet').length,
         rows,
+        total: rows.length,
+        watchItemCount: rows.reduce(
+          (sum, row) => sum + (Array.isArray(row.ai_watch_items) ? row.ai_watch_items.length : 0),
+          0,
+        ),
       } satisfies StatsData;
     },
     enabled: !!user && !!supabase,

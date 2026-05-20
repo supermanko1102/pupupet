@@ -29,7 +29,7 @@ import {
   buildRangeSummary,
   buildRecentDays,
   buildSections,
-  isAbnormalLog,
+  hasWatchItems,
   RANGE_OPTIONS,
   type DayMetric,
   type RangeKey,
@@ -38,7 +38,7 @@ import {
 export default function HistoryScreen() {
   const [rangeKey, setRangeKey] = useState<RangeKey>('7d');
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [abnormalOnly, setAbnormalOnly] = useState(false);
+  const [watchOnly, setWatchOnly] = useState(false);
   const [deletingLogId, setDeletingLogId] = useState<string | null>(null);
   const deletePoopLog = useDeletePoopLog();
 
@@ -85,7 +85,7 @@ export default function HistoryScreen() {
   );
 
   const baseLogs = selectedDate ? selectedDayLogs : logs;
-  const displayLogs = abnormalOnly ? baseLogs.filter(isAbnormalLog) : baseLogs;
+  const displayLogs = watchOnly ? baseLogs.filter(hasWatchItems) : baseLogs;
   const sections = buildSections(displayLogs, selectedDate);
   const showInitialLoading = isLoading && isStatsLoading;
 
@@ -104,7 +104,7 @@ export default function HistoryScreen() {
 
   function handleSelectDate(dateKey: string) {
     setSelectedDate(dateKey);
-    setAbnormalOnly(false);
+    setWatchOnly(false);
   }
 
   function handleDeleteLog(log: HistoryLog) {
@@ -189,7 +189,6 @@ export default function HistoryScreen() {
           stickySectionHeadersEnabled={false}
           ListHeaderComponent={
             <HistoryHeader
-              abnormalOnly={abnormalOnly}
               isStatsLoading={isStatsLoading}
               rangeDays={rangeDays}
               rangeKey={rangeKey}
@@ -200,14 +199,15 @@ export default function HistoryScreen() {
               onClearDate={() => setSelectedDate(null)}
               onRangeChange={setRangeKey}
               onSelectDate={handleSelectDate}
-              onToggleAbnormalOnly={setAbnormalOnly}
+              onToggleWatchOnly={setWatchOnly}
+              watchOnly={watchOnly}
             />
           }
           ListEmptyComponent={
             <HistoryEmptyRecords
-              abnormalOnly={abnormalOnly}
               isLoading={!!selectedDate && isSelectedDayLoading}
               selectedDate={selectedDate}
+              watchOnly={watchOnly}
             />
           }
           ListFooterComponent={

@@ -1,11 +1,8 @@
 import { supabase } from '@/lib/supabase';
-import type { Database } from '@/types/database';
-
-export type RiskLevel = Database['public']['Tables']['poop_logs']['Row']['risk_level'];
 
 export type LogSignal = {
+  ai_watch_items: string[] | null;
   captured_at: string;
-  risk_level: RiskLevel;
 };
 
 const POOP_LOGS_KEY = 'poop_logs';
@@ -23,13 +20,18 @@ export const poopLogsKeys = {
 
 const LOG_WITH_PET_SELECT = [
   'id',
+  'ai_escalation_signs',
+  'ai_findings',
+  'ai_next_step',
+  'ai_observation',
+  'ai_possible_reasons',
+  'ai_watch_items',
   'captured_at',
   'failure_reason',
   'image_path',
   'status',
   'summary',
   'recommendation',
-  'risk_level',
   'bristol_score',
   'pet_id',
   'note',
@@ -71,6 +73,12 @@ async function batchSignedUrls(paths: (string | null)[]): Promise<Map<string, st
 // ─── Log type + row mapper ────────────────────────────────────────────────────
 
 export type HistoryLog = {
+  aiEscalationSigns: string[];
+  aiFindings: string[];
+  aiNextStep: string | null;
+  aiObservation: string | null;
+  aiPossibleReasons: string[];
+  aiWatchItems: string[];
   bristolScore: number | null;
   capturedAt: string;
   failureReason: string | null;
@@ -81,7 +89,6 @@ export type HistoryLog = {
   petId: string | null;
   petName: string;
   recommendation: string | null;
-  riskLevel: RiskLevel;
   status: string;
   summary: string | null;
 };
@@ -89,6 +96,12 @@ export type HistoryLog = {
 export type RecentLog = HistoryLog;
 
 type HistoryRow = {
+  ai_escalation_signs: string[] | null;
+  ai_findings: string[] | null;
+  ai_next_step: string | null;
+  ai_observation: string | null;
+  ai_possible_reasons: string[] | null;
+  ai_watch_items: string[] | null;
   bristol_score: number | null;
   captured_at: string;
   failure_reason: string | null;
@@ -98,7 +111,6 @@ type HistoryRow = {
   pet_id: string | null;
   pets: { name: string } | null;
   recommendation: string | null;
-  risk_level: RiskLevel;
   status: string;
   summary: string | null;
 };
@@ -110,6 +122,12 @@ function mapHistoryRow(row: HistoryRow, signedUrlMap: Map<string, string>): Hist
       : '未分類';
 
   return {
+    aiEscalationSigns: textArray(row.ai_escalation_signs),
+    aiFindings: textArray(row.ai_findings),
+    aiNextStep: row.ai_next_step ?? null,
+    aiObservation: row.ai_observation ?? null,
+    aiPossibleReasons: textArray(row.ai_possible_reasons),
+    aiWatchItems: textArray(row.ai_watch_items),
     bristolScore: row.bristol_score ?? null,
     capturedAt: row.captured_at,
     failureReason: row.failure_reason ?? null,
@@ -120,10 +138,13 @@ function mapHistoryRow(row: HistoryRow, signedUrlMap: Map<string, string>): Hist
     petId: row.pet_id ?? null,
     petName,
     recommendation: row.recommendation ?? null,
-    riskLevel: row.risk_level,
     status: row.status,
     summary: row.summary ?? null,
   };
+}
+
+function textArray(value: string[] | null | undefined): string[] {
+  return Array.isArray(value) ? value.filter((item) => typeof item === 'string' && item.trim()) : [];
 }
 
 async function mapRowsWithSignedUrls(rows: HistoryRow[]): Promise<HistoryLog[]> {
@@ -198,7 +219,7 @@ export async function fetchDoneLogSignals(limit?: number): Promise<LogSignal[]> 
   const client = requireSupabase();
   let query = client
     .from('poop_logs')
-    .select('captured_at, risk_level')
+    .select('captured_at, ai_watch_items')
     .eq('status', 'done')
     .order('captured_at', { ascending: false });
 

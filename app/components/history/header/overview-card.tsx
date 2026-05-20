@@ -15,7 +15,7 @@ export function OverviewCard({
   rangeSummary: RangeSummary;
   trendSummary: TrendSummaryLike;
 }) {
-  const tone = trendSummary?.hasRecentAbnormal ? 'warning' : 'success';
+  const tone = trendSummary?.hasWatchItems ? 'warning' : 'success';
   const rangeLabel = rangeKey === '7d' ? '近 7 天' : '近 30 天';
 
   return (
@@ -23,13 +23,13 @@ export function OverviewCard({
       <View style={styles.top}>
         <View style={[styles.icon, tone === 'warning' ? styles.iconWarning : styles.iconSuccess]}>
           <Ionicons
-            name={tone === 'warning' ? 'warning-outline' : 'checkmark-circle-outline'}
+            name={tone === 'warning' ? 'eye-outline' : 'document-text-outline'}
             size={22}
             color={tone === 'warning' ? '#92400e' : '#065f46'}
           />
         </View>
         <View style={styles.copy}>
-          <Text style={styles.eyebrow}>健康總覽</Text>
+          <Text style={styles.eyebrow}>觀察總覽</Text>
           <Text style={styles.title}>
             {trendSummary?.message ?? (isLoading ? '載入趨勢中' : '還沒有記錄，開始第一筆吧')}
           </Text>
@@ -38,8 +38,8 @@ export function OverviewCard({
 
       <View style={styles.metricGrid}>
         <MetricTile label={`${rangeLabel}紀錄`} value={`${rangeSummary.totalCount}`} />
-        <MetricTile label="正常率" value={rangeSummary.normalRate === null ? '--' : `${rangeSummary.normalRate}%`} />
-        <MetricTile label="異常天數" value={`${rangeSummary.abnormalDays}`} />
+        <MetricTile label="有留意點" value={`${rangeSummary.watchItemCount}`} />
+        <MetricTile label="連續紀錄" value={`${rangeSummary.streakDays}天`} />
       </View>
     </View>
   );

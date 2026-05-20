@@ -3,13 +3,13 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { Surface } from '@/constants/theme';
 
 export function HistoryEmptyRecords({
-  abnormalOnly,
   isLoading,
   selectedDate,
+  watchOnly,
 }: {
-  abnormalOnly: boolean;
   isLoading: boolean;
   selectedDate: string | null;
+  watchOnly: boolean;
 }) {
   if (isLoading) {
     return (
@@ -22,9 +22,9 @@ export function HistoryEmptyRecords({
 
   return (
     <View style={styles.emptyState}>
-      <Ionicons name={abnormalOnly ? 'checkmark-circle-outline' : 'paw-outline'} size={44} color="#bbc9c7" />
+      <Ionicons name={watchOnly ? 'eye-outline' : 'paw-outline'} size={44} color="#bbc9c7" />
       <Text style={styles.emptyTitle}>
-        {selectedDate ? '這天沒有符合的紀錄' : abnormalOnly ? '目前沒有異常紀錄' : '還沒有紀錄'}
+        {selectedDate ? '這天沒有符合的紀錄' : watchOnly ? '目前沒有需留意紀錄' : '還沒有紀錄'}
       </Text>
       <Text style={styles.emptySubtitle}>
         {selectedDate ? '尚無資料符合目前條件。' : '回首頁記錄第一筆，只需要 5 秒。'}

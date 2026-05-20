@@ -15,22 +15,25 @@ import { Ionicons } from '@expo/vector-icons';
 import { modalStyles as ms } from '@/components/modal-styles';
 import { PetPicker } from '@/components/pet-picker';
 import { lightImpactFeedback, selectionFeedback } from '@/lib/haptics';
-import { riskBannerStyle, riskIcon, riskTitle } from '@/lib/logs/log-utils';
 import type { AnalysisFailureReason } from '@/lib/photos/photo-analysis-result';
 import type { PhotoAnalysisModalPhase, PhotoAnalysisProcessingStep } from '@/hooks/use-photo-analysis-flow';
 import type { Database } from '@/types/database';
 import { Brand, Ripple, Surface } from '@/constants/theme';
 
-type RiskLevel = Database['public']['Tables']['poop_logs']['Row']['risk_level'];
 type Pet = Database['public']['Tables']['pets']['Row'];
 
 export type AnalysisResult = {
+  aiEscalationSigns: string[];
+  aiFindings: string[];
+  aiNextStep: string | null;
+  aiObservation: string | null;
+  aiPossibleReasons: string[];
+  aiWatchItems: string[];
   bristolScore: number | null;
   failed?: boolean;
   failureReason?: AnalysisFailureReason | null;
   imageUrl: string;
   recommendation: string | null;
-  riskLevel: RiskLevel;
   summary: string | null;
 };
 
@@ -49,6 +52,7 @@ type Props = {
   onDismissProcessing: () => void;
   onPickPhoto: () => void;
   onRetake: () => void;
+  onScheduleFollowUp: () => void | Promise<void>;
 };
 
 const STEP_COPY: Record<PhotoAnalysisProcessingStep, {
@@ -67,9 +71,9 @@ const STEP_COPY: Record<PhotoAnalysisProcessingStep, {
     title: '正在建立紀錄',
   },
   analyzing: {
-    detail: 'AI 正在分析健康狀況，通常需要 10-30 秒。',
+    detail: 'AI 正在整理照片觀察，通常需要 10-30 秒。',
     icon: 'sparkles-outline',
-    title: 'AI 正在分析',
+    title: 'AI 正在觀察',
   },
   finalizing: {
     detail: '分析已完成，正在整理結果。',
@@ -93,6 +97,7 @@ export function PhotoAnalysisModal({
   onDismissProcessing,
   onPickPhoto,
   onRetake,
+  onScheduleFollowUp,
 }: Props) {
   function handleAssignPet(petId: string) {
     selectionFeedback();
@@ -117,6 +122,11 @@ export function PhotoAnalysisModal({
   function handleRetake() {
     lightImpactFeedback();
     onRetake();
+  }
+
+  function handleScheduleFollowUp() {
+    lightImpactFeedback();
+    void onScheduleFollowUp();
   }
 
   const stepCopy = STEP_COPY[processingStep];
@@ -180,31 +190,50 @@ export function PhotoAnalysisModal({
                   onRetake={handleRetake}
                 />
               ) : (
-                <View style={[ms.riskBanner, riskBannerStyle(analysisResult.riskLevel)]}>
-                  <Text style={ms.riskBannerIcon}>{riskIcon(analysisResult.riskLevel)}</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[ms.riskBannerTitle, { color: riskBannerStyle(analysisResult.riskLevel).textColor }]}>
-                      {riskTitle(analysisResult.riskLevel)}
-                    </Text>
-                    <Text style={[ms.riskBannerSub, { color: riskBannerStyle(analysisResult.riskLevel).textColor }]}>
-                      {analysisResult.summary ?? ''}
-                    </Text>
-                  </View>
-                </View>
+                <AnalysisObservationCard result={analysisResult} />
               )}
 
-              {!analysisResult.failed && analysisResult.recommendation && (
+              {!analysisResult.failed && (analysisResult.aiNextStep || analysisResult.recommendation) && (
                 <View style={ms.recommendBox}>
-                  <Text style={ms.recommendLabel}>建議</Text>
-                  <Text style={ms.recommendText}>{analysisResult.recommendation}</Text>
+                  <Text style={ms.recommendLabel}>接下來可以怎麼做</Text>
+                  <Text style={ms.recommendText}>
+                    {analysisResult.aiNextStep ?? analysisResult.recommendation}
+                  </Text>
                 </View>
               )}
 
-              {!analysisResult.failed && (analysisResult.riskLevel === 'vet' || analysisResult.riskLevel === 'observe') && (
-                <View style={ms.trackingNotice}>
-                  <Ionicons name="notifications-outline" size={16} color="#92400e" />
-                  <Text style={ms.trackingNoticeText}>明天會提醒你追蹤狀況</Text>
-                </View>
+              {!analysisResult.failed && analysisResult.aiPossibleReasons.length > 0 && (
+                <AnalysisListSection
+                  icon="bulb-outline"
+                  title="可能原因"
+                  items={analysisResult.aiPossibleReasons}
+                />
+              )}
+
+              {!analysisResult.failed && analysisResult.aiWatchItems.length > 0 && (
+                <AnalysisListSection
+                  icon="eye-outline"
+                  title="需要留意"
+                  items={analysisResult.aiWatchItems}
+                />
+              )}
+
+              {!analysisResult.failed && analysisResult.aiEscalationSigns.length > 0 && (
+                <AnalysisListSection
+                  icon="medical-outline"
+                  title="如果之後出現"
+                  items={analysisResult.aiEscalationSigns}
+                />
+              )}
+
+              {!analysisResult.failed && (
+                <Pressable
+                  android_ripple={Ripple.onLight}
+                  style={({ pressed }) => [styles.followUpButton, pressed && styles.buttonPressed]}
+                  onPress={handleScheduleFollowUp}>
+                  <Ionicons name="notifications-outline" size={16} color={Surface.inkSoft} />
+                  <Text style={styles.followUpButtonText}>明天提醒我再記錄一次</Text>
+                </Pressable>
               )}
 
               {!analysisResult.failed && (
@@ -257,6 +286,57 @@ export function PhotoAnalysisModal({
 
       </SafeAreaView>
     </Modal>
+  );
+}
+
+function AnalysisObservationCard({ result }: { result: AnalysisResult }) {
+  const observation = result.aiObservation ?? result.summary ?? 'AI 已完成照片觀察。';
+  const findings = result.aiFindings.length > 0 ? result.aiFindings : ['照片可判讀'];
+
+  return (
+    <View style={ms.observationCard}>
+      <View style={styles.observationHeader}>
+        <View style={styles.observationIconWrap}>
+          <Ionicons name="sparkles-outline" size={20} color={Brand.primary} />
+        </View>
+        <View style={styles.observationTitleWrap}>
+          <Text style={ms.observationTitle}>AI 觀察</Text>
+          <Text style={ms.observationText}>{observation}</Text>
+        </View>
+      </View>
+      <View style={styles.findingWrap}>
+        {findings.map((finding) => (
+          <View key={finding} style={styles.findingChip}>
+            <Text style={styles.findingText}>{finding}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function AnalysisListSection({
+  icon,
+  items,
+  title,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  items: string[];
+  title: string;
+}) {
+  return (
+    <View style={styles.analysisListBox}>
+      <View style={styles.analysisListHeader}>
+        <Ionicons name={icon} size={16} color={Surface.muted} />
+        <Text style={styles.analysisListTitle}>{title}</Text>
+      </View>
+      {items.map((item) => (
+        <View key={item} style={styles.analysisListRow}>
+          <View style={styles.analysisListDot} />
+          <Text style={styles.analysisListText}>{item}</Text>
+        </View>
+      ))}
+    </View>
   );
 }
 
@@ -330,7 +410,7 @@ function failureCopy(reason: AnalysisFailureReason) {
     return {
       icon: 'scan-outline' as const,
       iconColor: Surface.inkSoft,
-      subtitle: 'AI 無法從這張照片判讀健康狀況，請重新拍攝更清楚的畫面。',
+      subtitle: 'AI 無法從這張照片整理可靠觀察，請重新拍攝更清楚的畫面。',
       title: '照片不夠清楚',
     };
   }
@@ -420,6 +500,57 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   laterButtonText: { color: Surface.inkSoft, fontSize: 15, fontWeight: '700' },
+
+  observationHeader: { alignItems: 'flex-start', flexDirection: 'row', gap: 12 },
+  observationIconWrap: {
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 14,
+    height: 42,
+    justifyContent: 'center',
+    width: 42,
+  },
+  observationTitleWrap: { flex: 1, gap: 4, minWidth: 0 },
+  findingWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  findingChip: {
+    backgroundColor: '#ffffff',
+    borderColor: Surface.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  findingText: { color: Surface.inkSoft, fontSize: 13, fontWeight: '700' },
+  analysisListBox: {
+    backgroundColor: Surface.bgSoft,
+    borderRadius: 12,
+    gap: 9,
+    padding: 14,
+  },
+  analysisListHeader: { alignItems: 'center', flexDirection: 'row', gap: 7 },
+  analysisListTitle: { color: Surface.muted, fontSize: 13, fontWeight: '700' },
+  analysisListRow: { alignItems: 'flex-start', flexDirection: 'row', gap: 9 },
+  analysisListDot: {
+    backgroundColor: Surface.mutedSoft,
+    borderRadius: 999,
+    height: 5,
+    marginTop: 8,
+    width: 5,
+  },
+  analysisListText: { color: Surface.inkSoft, flex: 1, fontSize: 14, lineHeight: 20 },
+  followUpButton: {
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    backgroundColor: Surface.bgMuted,
+    borderRadius: 14,
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    minHeight: 46,
+    overflow: 'hidden',
+    paddingHorizontal: 14,
+  },
+  followUpButtonText: { color: Surface.inkSoft, fontSize: 14, fontWeight: '800' },
 
   failureWrap: {
     alignItems: 'center',

@@ -1,5 +1,4 @@
-import { logStatusTone } from '@/lib/logs/log-utils';
-import type { HistoryLog, LogSignal, RiskLevel } from '@/hooks/use-poop-logs';
+import type { HistoryLog, LogSignal } from '@/hooks/use-poop-logs';
 
 export type RangeKey = '7d' | '30d';
 
@@ -12,23 +11,21 @@ export type DayMetric = {
   count: number;
   dateKey: string;
   dayNumber: number;
+  hasWatchItems: boolean;
   isFuture: boolean;
   isToday: boolean;
-  normalCount: number;
-  observeCount: number;
-  riskLevel: RiskLevel;
-  vetCount: number;
+  watchItemCount: number;
   weekday: string;
 };
 
 export type RangeSummary = {
-  abnormalDays: number;
-  normalRate: number | null;
+  streakDays: number;
   totalCount: number;
+  watchItemCount: number;
 };
 
 export type TrendSummaryLike = {
-  hasRecentAbnormal: boolean;
+  hasWatchItems: boolean;
   message: string;
   recentCount: number;
 } | null | undefined;
@@ -84,12 +81,10 @@ export function buildRecentDays(rows: LogSignal[], dayCount: number): DayMetric[
       count: metric?.count ?? 0,
       dateKey,
       dayNumber: date.getDate(),
+      hasWatchItems: (metric?.watchItemCount ?? 0) > 0,
       isFuture: false,
       isToday: dateKey === toDateKey(today),
-      normalCount: metric?.normalCount ?? 0,
-      observeCount: metric?.observeCount ?? 0,
-      riskLevel: metric?.riskLevel ?? null,
-      vetCount: metric?.vetCount ?? 0,
+      watchItemCount: metric?.watchItemCount ?? 0,
       weekday: WEEKDAY_LABELS[date.getDay()],
     });
   }
@@ -115,12 +110,10 @@ export function buildCurrentMonthDays(rows: LogSignal[]): DayMetric[] {
       count: metric?.count ?? 0,
       dateKey,
       dayNumber,
+      hasWatchItems: (metric?.watchItemCount ?? 0) > 0,
       isFuture: date > today,
       isToday: dateKey === todayKey,
-      normalCount: metric?.normalCount ?? 0,
-      observeCount: metric?.observeCount ?? 0,
-      riskLevel: metric?.riskLevel ?? null,
-      vetCount: metric?.vetCount ?? 0,
+      watchItemCount: metric?.watchItemCount ?? 0,
       weekday: WEEKDAY_LABELS[date.getDay()],
     });
   }
@@ -129,31 +122,26 @@ export function buildCurrentMonthDays(rows: LogSignal[]): DayMetric[] {
 }
 
 export function buildRangeSummary(days: DayMetric[]): RangeSummary {
-  const totalCount = days.reduce((sum, day) => sum + day.count, 0);
-  const normalCount = days.reduce((sum, day) => sum + day.normalCount, 0);
-  const abnormalDays = days.filter((day) => isAbnormalRisk(day.riskLevel)).length;
-
   return {
-    abnormalDays,
-    normalRate: totalCount > 0 ? Math.round((normalCount / totalCount) * 100) : null,
-    totalCount,
+    streakDays: countTrailingRecordDays(days),
+    totalCount: days.reduce((sum, day) => sum + day.count, 0),
+    watchItemCount: days.reduce((sum, day) => sum + day.watchItemCount, 0),
   };
 }
 
-export function isAbnormalLog(log: HistoryLog) {
-  const tone = logStatusTone(log);
-  return tone === 'warning' || tone === 'danger';
+export function hasWatchItems(log: HistoryLog) {
+  return log.aiWatchItems.length > 0;
 }
 
-function isAbnormalRisk(riskLevel: RiskLevel) {
-  return riskLevel === 'observe' || riskLevel === 'vet';
-}
+function countTrailingRecordDays(days: DayMetric[]) {
+  let streak = 0;
 
-function riskRank(riskLevel: RiskLevel) {
-  if (riskLevel === 'vet') return 3;
-  if (riskLevel === 'observe') return 2;
-  if (riskLevel === 'normal') return 1;
-  return 0;
+  for (let index = days.length - 1; index >= 0; index--) {
+    if (days[index].count === 0) break;
+    streak += 1;
+  }
+
+  return streak;
 }
 
 function toDateKey(value: Date | string) {
@@ -189,32 +177,14 @@ export function formatLogDate(dateValue: string) {
 }
 
 function buildDailyMetricMap(rows: LogSignal[]) {
-  const map = new Map<string, {
-    count: number;
-    normalCount: number;
-    observeCount: number;
-    riskLevel: RiskLevel;
-    vetCount: number;
-  }>();
+  const map = new Map<string, { count: number; watchItemCount: number }>();
 
   for (const row of rows) {
     const dateKey = toDateKey(row.captured_at);
-    const current = map.get(dateKey) ?? {
-      count: 0,
-      normalCount: 0,
-      observeCount: 0,
-      riskLevel: null,
-      vetCount: 0,
-    };
-    const riskLevel = row.risk_level;
+    const current = map.get(dateKey) ?? { count: 0, watchItemCount: 0 };
 
     current.count += 1;
-    current.normalCount += riskLevel === 'normal' ? 1 : 0;
-    current.observeCount += riskLevel === 'observe' ? 1 : 0;
-    current.vetCount += riskLevel === 'vet' ? 1 : 0;
-    current.riskLevel = riskRank(riskLevel) > riskRank(current.riskLevel)
-      ? riskLevel
-      : current.riskLevel;
+    current.watchItemCount += Array.isArray(row.ai_watch_items) ? row.ai_watch_items.length : 0;
 
     map.set(dateKey, current);
   }

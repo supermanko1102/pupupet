@@ -2,12 +2,21 @@ import type { AnalysisResult } from '@/components/photo-analysis-modal';
 import type { Database } from '@/types/database';
 
 type PoopLogRow = Database['public']['Tables']['poop_logs']['Row'];
-type RiskLevel = PoopLogRow['risk_level'];
 export type AnalysisFailureReason = 'not_poop' | 'unclear' | 'system_error';
 
 export type PolledAnalysisLog = Pick<
   PoopLogRow,
-  'bristol_score' | 'failure_reason' | 'recommendation' | 'risk_level' | 'status' | 'summary'
+  | 'ai_escalation_signs'
+  | 'ai_findings'
+  | 'ai_next_step'
+  | 'ai_observation'
+  | 'ai_possible_reasons'
+  | 'ai_watch_items'
+  | 'bristol_score'
+  | 'failure_reason'
+  | 'recommendation'
+  | 'status'
+  | 'summary'
 >;
 
 export function createPollingFailureResult(
@@ -17,12 +26,17 @@ export function createPollingFailureResult(
   failureReason: AnalysisFailureReason = 'system_error'
 ): AnalysisResult {
   return {
-    imageUrl: previewUri,
+    aiEscalationSigns: [],
+    aiFindings: [],
+    aiNextStep: null,
+    aiObservation: null,
+    aiPossibleReasons: [],
+    aiWatchItems: [],
     bristolScore: null,
     failed: true,
     failureReason,
+    imageUrl: previewUri,
     recommendation,
-    riskLevel: null,
     summary,
   };
 }
@@ -35,23 +49,30 @@ export function createCompletedAnalysisResult(
   const failureReason = normalizeFailureReason(log.failure_reason);
 
   return {
-    imageUrl,
+    aiEscalationSigns: failed ? [] : textArray(log.ai_escalation_signs),
+    aiFindings: failed ? [] : textArray(log.ai_findings),
+    aiNextStep: failed ? null : (log.ai_next_step ?? log.recommendation ?? null),
+    aiObservation: failed ? null : (log.ai_observation ?? log.summary ?? null),
+    aiPossibleReasons: failed ? [] : textArray(log.ai_possible_reasons),
+    aiWatchItems: failed ? [] : textArray(log.ai_watch_items),
     bristolScore: log.bristol_score,
     failed,
     failureReason: failed ? failureReason : null,
-    recommendation: failed ? null : log.recommendation,
-    riskLevel: failed ? null : log.risk_level,
-    summary: failed ? (log.summary ?? failureSummary(failureReason)) : log.summary,
+    imageUrl,
+    recommendation: failed ? null : (log.recommendation ?? log.ai_next_step ?? null),
+    summary: failed
+      ? (log.summary ?? failureSummary(failureReason))
+      : (log.summary ?? log.ai_observation ?? null),
   };
-}
-
-export function shouldScheduleAnalysisFollowUp(riskLevel: RiskLevel) {
-  return riskLevel === 'vet' || riskLevel === 'observe';
 }
 
 function normalizeFailureReason(value: string | null | undefined): AnalysisFailureReason {
   if (value === 'not_poop' || value === 'unclear' || value === 'system_error') return value;
   return 'system_error';
+}
+
+function textArray(value: string[] | null | undefined): string[] {
+  return Array.isArray(value) ? value.filter((item) => typeof item === 'string' && item.trim()) : [];
 }
 
 function failureSummary(reason: AnalysisFailureReason) {

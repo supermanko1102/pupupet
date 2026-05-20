@@ -3,7 +3,6 @@ import { ScrollView, StyleSheet, Text } from 'react-native';
 
 import { Brand, StatusColors, Surface } from '@/constants/theme';
 import { Card, Press, SectionHeader } from '@/components/ui';
-import type { RiskLevel } from '@/hooks/use-poop-logs';
 import { selectionFeedback } from '@/lib/haptics';
 import { formatShortDate, type DayMetric } from '@/lib/logs/history-metrics';
 
@@ -34,16 +33,21 @@ export function RecordDaysStrip({
                 key={day.dateKey}
                 style={[
                   styles.chip,
-                  { borderColor: riskAccentColor(day.riskLevel) },
+                  { borderColor: day.hasWatchItems ? '#f59e0b' : Brand.primary },
                   isSelected && styles.chipSelected,
                 ]}
                 onPress={() => handleDayPress(day.dateKey)}>
                 <Ionicons
-                  name={recordDayIcon(day.riskLevel)}
+                  name={day.hasWatchItems ? 'eye-outline' : 'document-text-outline'}
                   size={15}
-                  color={riskTextColor(day.riskLevel)}
+                  color={day.hasWatchItems ? StatusColors.observe.text : StatusColors.normal.text}
                 />
-                <Text style={[styles.chipDate, { color: riskTextColor(day.riskLevel) }]}>
+                <Text
+                  style={[
+                    styles.chipDate,
+                    { color: day.hasWatchItems ? StatusColors.observe.text : StatusColors.normal.text },
+                  ]}
+                >
                   {formatShortDate(day.dateKey)}
                 </Text>
                 <Text style={styles.chipCount}>{day.count} 筆</Text>
@@ -56,27 +60,6 @@ export function RecordDaysStrip({
       )}
     </Card>
   );
-}
-
-function riskAccentColor(riskLevel: RiskLevel) {
-  if (riskLevel === 'vet') return '#ef4444';
-  if (riskLevel === 'observe') return '#f59e0b';
-  if (riskLevel === 'normal') return Brand.primary;
-  return '#d9e2e0';
-}
-
-function riskTextColor(riskLevel: RiskLevel) {
-  if (riskLevel === 'vet') return StatusColors.vet.text;
-  if (riskLevel === 'observe') return StatusColors.observe.text;
-  if (riskLevel === 'normal') return StatusColors.normal.text;
-  return StatusColors.neutral.text;
-}
-
-function recordDayIcon(riskLevel: RiskLevel) {
-  if (riskLevel === 'vet') return 'medical-outline';
-  if (riskLevel === 'observe') return 'alert-circle-outline';
-  if (riskLevel === 'normal') return 'checkmark-circle-outline';
-  return 'ellipse-outline';
 }
 
 const styles = StyleSheet.create({

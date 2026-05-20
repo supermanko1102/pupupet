@@ -13,18 +13,16 @@ type Props = {
 export function NotificationDebugPanel({ recentLogs, onOpenFollowUp }: Props) {
   if (recentLogs.length === 0) return null;
 
-  const firstAbnormal = recentLogs.find(
-    (l) => l.riskLevel === 'vet' || l.riskLevel === 'observe'
-  ) ?? recentLogs[0];
+  const targetLog = recentLogs.find((log) => log.aiWatchItems.length > 0) ?? recentLogs[0];
 
   async function scheduleIn5Seconds() {
-    await cancelFollowUp(firstAbnormal.id);
+    await cancelFollowUp(targetLog.id);
     await Notifications.scheduleNotificationAsync({
-      identifier: `follow_up_${firstAbnormal.id}`,
+      identifier: `follow_up_${targetLog.id}`,
       content: {
-        title: '記得追蹤昨天的異常',
-        body: '（測試）昨天有記錄到異常狀況，今天排便後記得再記錄一次。',
-        data: { logId: firstAbnormal.id, type: 'abnormal_follow_up' },
+        title: '記得再記錄一次',
+        body: '（測試）今天可以再拍一張，看看後續外觀變化。',
+        data: { logId: targetLog.id, type: 'log_follow_up' },
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
@@ -39,9 +37,9 @@ export function NotificationDebugPanel({ recentLogs, onOpenFollowUp }: Props) {
     <View style={styles.panel}>
       <Text style={styles.title}>🛠 DEV: 通知測試</Text>
       <Text style={styles.target} numberOfLines={1}>
-        目標 log：{firstAbnormal.id.slice(0, 8)}… ({firstAbnormal.riskLevel ?? '未分析'})
+        目標 log：{targetLog.id.slice(0, 8)}… ({targetLog.aiWatchItems.length > 0 ? '需留意' : '已分析'})
       </Text>
-      <Pressable style={styles.btn} onPress={() => onOpenFollowUp(firstAbnormal)}>
+      <Pressable style={styles.btn} onPress={() => onOpenFollowUp(targetLog)}>
         <Text style={styles.btnText}>直接開 Follow-up Modal</Text>
       </Pressable>
       <Pressable style={[styles.btn, styles.btnSecondary]} onPress={() => void scheduleIn5Seconds()}>

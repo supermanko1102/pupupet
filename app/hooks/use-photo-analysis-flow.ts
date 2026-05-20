@@ -8,10 +8,10 @@ import { useAssignPet } from '@/hooks/use-pets';
 import { createAnalysisLog } from '@/lib/logs/analysis';
 import { pollAnalysisOnce, type AnalysisPollerDeps } from '@/lib/logs/analysis-poller';
 import { PollingController } from '@/lib/logs/polling-controller';
-import { scheduleAbnormalFollowUp } from '@/lib/notifications';
+import { scheduleLogFollowUp } from '@/lib/notifications';
 import {
   createPollingFailureResult,
-  shouldScheduleAnalysisFollowUp,
+  type PolledAnalysisLog,
 } from '@/lib/photos/photo-analysis-result';
 import { PHOTO_PICKER_OPTIONS, firstPickedAsset } from '@/lib/photos/photo-picker';
 import { deletePoopPhoto, uploadPoopPhoto } from '@/lib/photos/uploads';
@@ -172,10 +172,24 @@ export function usePhotoAnalysisFlow({ onLogsUpdated }: Props) {
         fetchLogStatus: async (id) => {
           const { data, error } = await client
             .from('poop_logs')
-            .select('status, bristol_score, failure_reason, risk_level, summary, recommendation')
+            .select(
+              [
+                'status',
+                'bristol_score',
+                'failure_reason',
+                'summary',
+                'recommendation',
+                'ai_observation',
+                'ai_findings',
+                'ai_possible_reasons',
+                'ai_next_step',
+                'ai_watch_items',
+                'ai_escalation_signs',
+              ].join(', '),
+            )
             .eq('id', id)
             .single();
-          return { data, error };
+          return { data: data as PolledAnalysisLog | null, error };
         },
         createSignedUrl: async (path) => {
           const { data } = await client.storage.from('poop-photos').createSignedUrl(path, 60 * 60);
@@ -206,9 +220,6 @@ export function usePhotoAnalysisFlow({ onLogsUpdated }: Props) {
             stopPolling();
             setProcessingStage('finalizing');
             setAnalysisResult(outcome.result);
-            if (shouldScheduleAnalysisFollowUp(outcome.result.riskLevel)) {
-              scheduleAbnormalFollowUp(outcome.logId);
-            }
             setProcessingProgress(1);
             clearResultTimer();
             resultTimerRef.current = setTimeout(
@@ -227,6 +238,11 @@ export function usePhotoAnalysisFlow({ onLogsUpdated }: Props) {
     },
     [clearResultTimer, onLogsUpdated, setProcessingStage, showPollingFailure, stopPolling],
   );
+
+  const scheduleCurrentFollowUp = useCallback(async () => {
+    if (!currentLogId) return;
+    await scheduleLogFollowUp(currentLogId);
+  }, [currentLogId]);
 
   const uploadAsset = useCallback(
     async (asset: ImagePicker.ImagePickerAsset) => {
@@ -363,6 +379,7 @@ export function usePhotoAnalysisFlow({ onLogsUpdated }: Props) {
     processingProgress,
     processingStartedAt,
     processingStep,
+    scheduleCurrentFollowUp,
     startScan,
   };
 }

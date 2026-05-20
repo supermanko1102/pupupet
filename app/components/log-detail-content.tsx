@@ -13,8 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { modalStyles as ms } from '@/components/modal-styles';
 import { PetPicker } from '@/components/pet-picker';
 import { Button } from '@/components/ui';
-import { riskBannerStyle, riskIcon, riskTitle } from '@/lib/logs/log-utils';
-import { cancelFollowUp, scheduleAbnormalFollowUp } from '@/lib/notifications';
+import { cancelFollowUp, scheduleLogFollowUp } from '@/lib/notifications';
 import type { AnalysisFailureReason } from '@/lib/photos/photo-analysis-result';
 import type { HistoryLog } from '@/hooks/use-poop-logs';
 import type { Database } from '@/types/database';
@@ -61,8 +60,8 @@ export function LogDetailContent({
             <View style={styles.pendingIconWrap}>
               <ActivityIndicator color="#20B2AA" />
             </View>
-            <Text style={styles.pendingTitle}>分析仍在進行中</Text>
-            <Text style={styles.pendingSubtitle}>AI 正在處理這張照片，完成後歷程會自動更新結果。</Text>
+            <Text style={styles.pendingTitle}>觀察仍在整理中</Text>
+            <Text style={styles.pendingSubtitle}>AI 正在整理這張照片，完成後歷程會自動更新結果。</Text>
           </View>
         ) : isFailed ? (
           <View style={styles.failureBox}>
@@ -73,19 +72,7 @@ export function LogDetailContent({
             <Text style={styles.failureSubtitle}>{failure.subtitle}</Text>
           </View>
         ) : (
-          <View style={[ms.riskBanner, riskBannerStyle(log.riskLevel)]}>
-            <Text style={ms.riskBannerIcon}>{riskIcon(log.riskLevel)}</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={[ms.riskBannerTitle, { color: riskBannerStyle(log.riskLevel).textColor }]}>
-                {riskTitle(log.riskLevel)}
-              </Text>
-              {log.summary ? (
-                <Text style={[ms.riskBannerSub, { color: riskBannerStyle(log.riskLevel).textColor }]}>
-                  {log.summary}
-                </Text>
-              ) : null}
-            </View>
-          </View>
+          <ObservationCard log={log} />
         )}
 
         {log.note ? (
@@ -95,11 +82,23 @@ export function LogDetailContent({
           </View>
         ) : null}
 
-        {!isPending && !isFailed && log.recommendation ? (
+        {!isPending && !isFailed && (log.aiNextStep || log.recommendation) ? (
           <View style={ms.recommendBox}>
-            <Text style={ms.recommendLabel}>建議</Text>
-            <Text style={ms.recommendText}>{log.recommendation}</Text>
+            <Text style={ms.recommendLabel}>接下來可以怎麼做</Text>
+            <Text style={ms.recommendText}>{log.aiNextStep ?? log.recommendation}</Text>
           </View>
+        ) : null}
+
+        {!isPending && !isFailed && log.aiPossibleReasons.length > 0 ? (
+          <AnalysisListSection icon="bulb-outline" title="可能原因" items={log.aiPossibleReasons} />
+        ) : null}
+
+        {!isPending && !isFailed && log.aiWatchItems.length > 0 ? (
+          <AnalysisListSection icon="eye-outline" title="需要留意" items={log.aiWatchItems} />
+        ) : null}
+
+        {!isPending && !isFailed && log.aiEscalationSigns.length > 0 ? (
+          <AnalysisListSection icon="medical-outline" title="如果之後出現" items={log.aiEscalationSigns} />
         ) : null}
 
         {isPending || isFailed ? null : log.petId ? (
@@ -129,17 +128,17 @@ export function LogDetailContent({
         </View>
       </View>
 
-      {isFollowUp && !isFailed && log.riskLevel !== 'normal' ? (
+      {isFollowUp && !isFailed ? (
         <View style={ms.modalActions}>
-          <Text style={styles.followUpLabel}>今天恢復正常了嗎？</Text>
+          <Text style={styles.followUpLabel}>今天要再記錄一次嗎？</Text>
           <Button
-            label="已恢復正常"
+            label="我已經記錄了"
             onPress={() => { void cancelFollowUp(log.id); onClose(); }}
           />
           <Button
-            label="仍在觀察中，明天再提醒"
+            label="明天再提醒"
             variant="ghost"
-            onPress={() => { void scheduleAbnormalFollowUp(log.id); onClose(); }}
+            onPress={() => { void scheduleLogFollowUp(log.id); onClose(); }}
           />
         </View>
       ) : (
@@ -148,6 +147,57 @@ export function LogDetailContent({
         </View>
       )}
     </ScrollView>
+  );
+}
+
+function ObservationCard({ log }: { log: HistoryLog }) {
+  const observation = log.aiObservation ?? log.summary ?? 'AI 已完成照片觀察。';
+  const findings = log.aiFindings.length > 0 ? log.aiFindings : ['照片可判讀'];
+
+  return (
+    <View style={ms.observationCard}>
+      <View style={styles.observationHeader}>
+        <View style={styles.observationIconWrap}>
+          <Ionicons name="sparkles-outline" size={20} color="#20B2AA" />
+        </View>
+        <View style={styles.observationTitleWrap}>
+          <Text style={ms.observationTitle}>AI 觀察</Text>
+          <Text style={ms.observationText}>{observation}</Text>
+        </View>
+      </View>
+      <View style={styles.findingWrap}>
+        {findings.map((finding) => (
+          <View key={finding} style={styles.findingChip}>
+            <Text style={styles.findingText}>{finding}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function AnalysisListSection({
+  icon,
+  items,
+  title,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  items: string[];
+  title: string;
+}) {
+  return (
+    <View style={styles.analysisListBox}>
+      <View style={styles.analysisListHeader}>
+        <Ionicons name={icon} size={16} color={Surface.muted} />
+        <Text style={styles.analysisListTitle}>{title}</Text>
+      </View>
+      {items.map((item) => (
+        <View key={item} style={styles.analysisListRow}>
+          <View style={styles.analysisListDot} />
+          <Text style={styles.analysisListText}>{item}</Text>
+        </View>
+      ))}
+    </View>
   );
 }
 
@@ -170,7 +220,7 @@ function failureCopy(reason: AnalysisFailureReason) {
     return {
       icon: 'scan-outline' as const,
       iconColor: Surface.inkSoft,
-      subtitle: 'AI 無法從這張照片判讀健康狀況，請重新拍攝更清楚的畫面。',
+      subtitle: 'AI 無法從這張照片整理可靠觀察，請重新拍攝更清楚的畫面。',
       title: '照片不夠清楚',
     };
   }
@@ -239,6 +289,44 @@ const styles = StyleSheet.create({
   },
   failureTitle: { color: Surface.ink, fontSize: 18, fontWeight: '800', textAlign: 'center' },
   failureSubtitle: { color: Surface.muted, fontSize: 14, lineHeight: 21, textAlign: 'center' },
+
+  observationHeader: { alignItems: 'flex-start', flexDirection: 'row', gap: 12 },
+  observationIconWrap: {
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 14,
+    height: 42,
+    justifyContent: 'center',
+    width: 42,
+  },
+  observationTitleWrap: { flex: 1, gap: 4, minWidth: 0 },
+  findingWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  findingChip: {
+    backgroundColor: '#ffffff',
+    borderColor: Surface.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  findingText: { color: Surface.inkSoft, fontSize: 13, fontWeight: '700' },
+  analysisListBox: {
+    backgroundColor: Surface.bgSoft,
+    borderRadius: 12,
+    gap: 9,
+    padding: 14,
+  },
+  analysisListHeader: { alignItems: 'center', flexDirection: 'row', gap: 7 },
+  analysisListTitle: { color: Surface.muted, fontSize: 13, fontWeight: '700' },
+  analysisListRow: { alignItems: 'flex-start', flexDirection: 'row', gap: 9 },
+  analysisListDot: {
+    backgroundColor: Surface.mutedSoft,
+    borderRadius: 999,
+    height: 5,
+    marginTop: 8,
+    width: 5,
+  },
+  analysisListText: { color: Surface.inkSoft, flex: 1, fontSize: 14, lineHeight: 20 },
 
   infoRow: {
     alignItems: 'center', backgroundColor: Surface.bgSoft, borderRadius: 12,

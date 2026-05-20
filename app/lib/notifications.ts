@@ -25,8 +25,8 @@ async function ensureNotificationPermission(): Promise<boolean> {
   return isPermissionGranted(result);
 }
 
-// 排程異常追蹤提醒（次日早上 9:00）
-export async function scheduleAbnormalFollowUp(logId: string): Promise<void> {
+// 排程追蹤提醒（次日早上 9:00）
+export async function scheduleLogFollowUp(logId: string): Promise<void> {
   const granted = await ensureNotificationPermission();
   if (!granted) return;
 
@@ -40,9 +40,9 @@ export async function scheduleAbnormalFollowUp(logId: string): Promise<void> {
   await Notifications.scheduleNotificationAsync({
     identifier: followUpId(logId),
     content: {
-      title: '記得追蹤昨天的異常',
-      body: '昨天有記錄到異常狀況，今天排便後記得再記錄一次，確認是否恢復正常。',
-      data: { logId, type: 'abnormal_follow_up' },
+      title: '記得再記錄一次',
+      body: '昨天有一筆便便紀錄，今天可以再拍一張，看看後續外觀變化。',
+      data: { logId, type: 'log_follow_up' },
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DATE,

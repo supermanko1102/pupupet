@@ -12,31 +12,31 @@ import { RecordDaysStrip } from './record-days-strip';
 import { RecordsToolbar } from './records-toolbar';
 
 export function HistoryHeader({
-  abnormalOnly,
   isStatsLoading,
   onClearDate,
   onRangeChange,
   onSelectDate,
-  onToggleAbnormalOnly,
+  onToggleWatchOnly,
   rangeDays,
   rangeKey,
   recordDays,
   rangeSummary,
   selectedDate,
   trendSummary,
+  watchOnly,
 }: {
-  abnormalOnly: boolean;
   isStatsLoading: boolean;
   onClearDate: () => void;
   onRangeChange: (range: RangeKey) => void;
   onSelectDate: (dateKey: string) => void;
-  onToggleAbnormalOnly: (value: boolean) => void;
+  onToggleWatchOnly: (value: boolean) => void;
   rangeDays: DayMetric[];
   rangeKey: RangeKey;
   recordDays: DayMetric[];
   rangeSummary: RangeSummary;
   selectedDate: string | null;
   trendSummary: TrendSummaryLike;
+  watchOnly: boolean;
 }) {
   return (
     <View style={styles.wrap}>
@@ -50,11 +50,11 @@ export function HistoryHeader({
       <DailyBars days={rangeDays} />
       <RecordDaysStrip days={recordDays} selectedDate={selectedDate} onSelectDate={onSelectDate} />
       <RecordsToolbar
-        abnormalOnly={abnormalOnly}
         selectedDate={selectedDate}
         onClearDate={onClearDate}
+        watchOnly={watchOnly}
       />
-      <FilterRow abnormalOnly={abnormalOnly} onToggleAbnormalOnly={onToggleAbnormalOnly} />
+      <FilterRow watchOnly={watchOnly} onToggleWatchOnly={onToggleWatchOnly} />
       <View style={styles.swipeHint}>
         <Ionicons name="chevron-back-outline" size={14} color={Surface.mutedSoft} />
         <Text style={styles.swipeHintText}>左滑完成或失敗的紀錄可刪除</Text>

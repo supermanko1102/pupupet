@@ -13,7 +13,7 @@ export default function FollowUpScreen() {
 
   return (
     <SafeAreaView style={styles.screen}>
-      <Stack.Screen options={{ title: '異常追蹤' }} />
+      <Stack.Screen options={{ title: '追蹤提醒' }} />
 
       {isLoading ? (
         <View style={styles.centered}>

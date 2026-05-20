@@ -9,7 +9,6 @@ const MODEL = 'claude-opus-4-5';
 const SYSTEM_FAILURE_SUMMARY = '暫時無法完成分析，請稍後再試。';
 
 type ImageMediaType = 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
-type RiskLevel = 'normal' | 'observe' | 'vet';
 type PoopColor = 'brown' | 'yellow' | 'black' | 'red' | 'green' | 'other';
 type Consistency = 'hard' | 'normal' | 'soft' | 'liquid';
 type FailureReason = 'not_poop' | 'unclear' | 'system_error';
@@ -20,6 +19,12 @@ type ImagePayload = {
 };
 
 type Analysis = {
+  aiEscalationSigns: string[];
+  aiFindings: string[];
+  aiNextStep: string | null;
+  aiObservation: string | null;
+  aiPossibleReasons: string[];
+  aiWatchItems: string[];
   bristolScore: number | null;
   color: PoopColor | null;
   confidence: number | null;
@@ -28,7 +33,6 @@ type Analysis = {
   isAnalyzable: boolean;
   raw: Record<string, unknown>;
   recommendation: string;
-  riskLevel: RiskLevel | null;
   summary: string;
 };
 
@@ -41,7 +45,6 @@ const IMAGE_MEDIA_TYPES = new Set<ImageMediaType>([
 
 const COLORS = new Set<PoopColor>(['brown', 'yellow', 'black', 'red', 'green', 'other']);
 const CONSISTENCIES = new Set<Consistency>(['hard', 'normal', 'soft', 'liquid']);
-const RISK_LEVELS = new Set<RiskLevel>(['normal', 'observe', 'vet']);
 const FAILURE_REASONS = new Set<FailureReason>(['not_poop', 'unclear', 'system_error']);
 
 export function toErrorMessage(error: unknown): string {
@@ -75,10 +78,15 @@ export async function processOneJob(): Promise<{ success: boolean; id?: string; 
     if (!analysis.isAnalyzable) {
       await updateLog(id, {
         status: 'failed',
+        ai_observation: null,
+        ai_findings: [],
+        ai_possible_reasons: [],
+        ai_next_step: null,
+        ai_watch_items: [],
+        ai_escalation_signs: [],
         bristol_score: null,
         color: null,
         consistency: null,
-        risk_level: null,
         summary: analysis.summary,
         recommendation: analysis.recommendation,
         confidence: analysis.confidence,
@@ -92,10 +100,15 @@ export async function processOneJob(): Promise<{ success: boolean; id?: string; 
 
     await updateLog(id, {
       status: 'done',
+      ai_observation: analysis.aiObservation,
+      ai_findings: analysis.aiFindings,
+      ai_possible_reasons: analysis.aiPossibleReasons,
+      ai_next_step: analysis.aiNextStep,
+      ai_watch_items: analysis.aiWatchItems,
+      ai_escalation_signs: analysis.aiEscalationSigns,
       bristol_score: analysis.bristolScore,
       color: analysis.color,
       consistency: analysis.consistency,
-      risk_level: analysis.riskLevel,
       summary: analysis.summary,
       recommendation: analysis.recommendation,
       confidence: analysis.confidence,
@@ -161,7 +174,7 @@ async function analyzeWithClaude(image: ImagePayload): Promise<Analysis> {
           },
           {
             type: 'text',
-            text: `你是一位寵物健康助理。請先判斷照片是否適合做寵物糞便健康分析，再以 JSON 格式回傳以下欄位：
+            text: `你是一位寵物健康觀察助理。請先判斷照片是否適合做寵物糞便外觀觀察，再以 JSON 格式回傳以下欄位：
 
 {
   "isAnalyzable": <boolean，照片中有清楚可判讀的寵物糞便時為 true，否則 false>,
@@ -169,33 +182,30 @@ async function analyzeWithClaude(image: ImagePayload): Promise<Analysis> {
   "bristolScore": <1-7 的整數，依據 Bristol Stool Scale，無法判斷填 null>,
   "color": <null | "brown" | "yellow" | "black" | "red" | "green" | "other">,
   "consistency": <null | "hard" | "normal" | "soft" | "liquid">,
-  "riskLevel": <null | "normal" | "observe" | "vet">,
-  "summary": <給飼主看的一句話中文摘要，20 字以內>,
-  "recommendation": <給飼主的中文建議，50 字以內>,
+  "aiObservation": <照片觀察，一句中文，60 字以內>,
+  "aiFindings": <中文字串陣列，列出 1-4 個可見特徵>,
+  "aiPossibleReasons": <中文字串陣列，列出 0-3 個非診斷性的可能背景或原因>,
+  "aiNextStep": <給飼主的下一步中文建議，80 字以內>,
+  "aiWatchItems": <中文字串陣列，列出 0-4 個接下來可留意的點>,
+  "aiEscalationSigns": <中文字串陣列，列出 0-4 個未來若出現應聯絡獸醫的警訊>,
+  "summary": <同 aiObservation，給舊版 fallback 使用>,
+  "recommendation": <同 aiNextStep，給舊版 fallback 使用>,
   "confidence": <0.0-1.0 的小數，代表分析可信度>
 }
 
 可分析判斷：
 - 如果照片看起來不是寵物糞便，isAnalyzable=false，failureReason="not_poop"
 - 如果照片太暗、太模糊、太遠、糞便被遮擋或不完整到無法判讀，isAnalyzable=false，failureReason="unclear"
-- isAnalyzable=false 時，bristolScore/color/consistency/riskLevel 都填 null
-- isAnalyzable=false 時，不要做健康判斷；summary 說明照片無法分析，recommendation 給重新拍攝建議
-- 只有照片中有清楚可判讀的寵物糞便時，isAnalyzable=true 並填健康分析欄位
+- isAnalyzable=false 時，bristolScore/color/consistency 都填 null，所有 ai* 陣列填 []，aiObservation/aiNextStep 可說明無法分析與重拍建議
+- 只有照片中有清楚可判讀的寵物糞便時，isAnalyzable=true 並填外觀觀察欄位
 
-riskLevel 判斷標準：
-- normal：外觀正常，顏色棕色、形狀成形、軟硬適中，無任何異狀
-- observe：有輕微異常但不需立即就醫，例如偏軟、顏色略深或略淺、形狀稍不規則
-- vet：有明顯異常需就醫，例如血便、黑焦油便、鮮紅血絲、灰白色、嚴重水瀉、寄生蟲跡象
-
-summary 撰寫規則：
-- normal：簡短說明正常狀態，例如「糞便成形、顏色正常，狀況良好」
-- observe：說明具體異常點，例如「糞便偏軟，建議觀察是否持續兩天以上」
-- vet：點出需就醫的關鍵症狀，例如「發現血絲，建議盡快就醫」
-
-recommendation 撰寫規則：
-- normal：給一個維持健康的日常小建議
-- observe：告訴飼主觀察什麼、觀察多久、什麼情況要升級就醫
-- vet：強調就醫urgency，並建議就診前可以做的事（如保留樣本）
+語氣規則：
+- 不要輸出 riskLevel、normal、observe、vet 或任何分級欄位
+- 不要使用「診斷」「判定」「確診」「必須就醫」等診斷或命令語氣
+- 使用「照片中看起來」「可見」「可能」「建議接下來留意」等觀察語氣
+- 顏色或形狀和典型棕色成形糞便不同時，只描述你看到的外觀與可觀察方向，不要下醫療結論
+- aiEscalationSigns 只描述未來若持續或合併出現時可聯絡獸醫的警訊，例如反覆血色、黑色焦油狀、持續水便、嘔吐、精神或食慾下降
+- 如果疑似光線、陰影、相機白平衡或食物染色造成顏色偏差，請在 aiPossibleReasons 或 aiNextStep 中提醒重新拍攝或持續觀察
 
 只回傳 JSON，不要加其他文字。`,
           },
@@ -227,12 +237,31 @@ function parseJsonObject(text: string): Record<string, unknown> {
 }
 
 function validateAnalysis(raw: Record<string, unknown>): Analysis {
-  const isAnalyzable = booleanWithFallback(raw.isAnalyzable, raw.riskLevel !== null && raw.riskLevel !== undefined);
+  const isAnalyzable = booleanWithFallback(
+    raw.isAnalyzable,
+    raw.aiObservation !== null && raw.aiObservation !== undefined
+  );
   const failureReason = isAnalyzable
     ? null
     : (nullableEnum(raw.failureReason, 'failureReason', FAILURE_REASONS) ?? 'unclear');
+  const aiObservation = isAnalyzable
+    ? requiredText(raw.aiObservation ?? raw.summary, 'aiObservation', 120)
+    : null;
+  const aiNextStep = isAnalyzable
+    ? requiredText(raw.aiNextStep ?? raw.recommendation, 'aiNextStep', 160)
+    : null;
+  const failureSummaryText = failureSummary(failureReason);
+  const failureRecommendation = failureReason === 'system_error'
+    ? '請稍後再試，或到歷程查看是否完成。'
+    : '請重新拍攝光線充足、便便完整清楚的照片。';
 
   return {
+    aiEscalationSigns: isAnalyzable ? textArray(raw.aiEscalationSigns, 'aiEscalationSigns', 4, 80) : [],
+    aiFindings: isAnalyzable ? textArray(raw.aiFindings, 'aiFindings', 4, 60) : [],
+    aiNextStep,
+    aiObservation,
+    aiPossibleReasons: isAnalyzable ? textArray(raw.aiPossibleReasons, 'aiPossibleReasons', 3, 80) : [],
+    aiWatchItems: isAnalyzable ? textArray(raw.aiWatchItems, 'aiWatchItems', 4, 80) : [],
     bristolScore: isAnalyzable ? nullableInteger(raw.bristolScore, 'bristolScore', 1, 7) : null,
     color: isAnalyzable ? nullableEnum(raw.color, 'color', COLORS) : null,
     confidence: nullableNumber(raw.confidence, 'confidence', 0, 1),
@@ -240,15 +269,24 @@ function validateAnalysis(raw: Record<string, unknown>): Analysis {
     failureReason,
     isAnalyzable,
     raw,
-    recommendation: requiredText(raw.recommendation, 'recommendation', 120),
-    riskLevel: isAnalyzable ? requiredEnum(raw.riskLevel, 'riskLevel', RISK_LEVELS) : null,
-    summary: requiredText(raw.summary, 'summary', 80),
+    recommendation: isAnalyzable
+      ? requiredText(raw.recommendation ?? aiNextStep, 'recommendation', 160)
+      : optionalText(raw.recommendation, 160) ?? failureRecommendation,
+    summary: isAnalyzable
+      ? requiredText(raw.summary ?? aiObservation, 'summary', 120)
+      : optionalText(raw.summary, 120) ?? failureSummaryText,
   };
 }
 
 function booleanWithFallback(value: unknown, fallback: boolean): boolean {
   if (typeof value === 'boolean') return value;
   return fallback;
+}
+
+function failureSummary(reason: FailureReason | null): string {
+  if (reason === 'not_poop') return '這張照片無法分析。';
+  if (reason === 'unclear') return '照片不夠清楚。';
+  return SYSTEM_FAILURE_SUMMARY;
 }
 
 function requiredText(value: unknown, field: string, maxLength: number): string {
@@ -262,6 +300,28 @@ function requiredText(value: unknown, field: string, maxLength: number): string 
   }
 
   return text.slice(0, maxLength);
+}
+
+function optionalText(value: unknown, maxLength: number): string | null {
+  if (typeof value !== 'string') return null;
+  const text = value.trim();
+  return text ? text.slice(0, maxLength) : null;
+}
+
+function textArray(value: unknown, field: string, maxItems: number, maxLength: number): string[] {
+  if (value === null || value === undefined) return [];
+
+  const values = Array.isArray(value) ? value : [value];
+  return values
+    .map((item) => {
+      if (typeof item !== 'string') {
+        throw new Error(`Invalid analysis.${field}: expected string array`);
+      }
+
+      return item.trim().slice(0, maxLength);
+    })
+    .filter(Boolean)
+    .slice(0, maxItems);
 }
 
 function requiredEnum<T extends string>(value: unknown, field: string, allowed: Set<T>): T {
@@ -335,6 +395,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 async function markJobFailed(id: string, error: string) {
   await updateLog(id, {
     status: 'failed',
+    ai_observation: null,
+    ai_findings: [],
+    ai_possible_reasons: [],
+    ai_next_step: null,
+    ai_watch_items: [],
+    ai_escalation_signs: [],
     summary: SYSTEM_FAILURE_SUMMARY,
     recommendation: null,
     failure_reason: 'system_error',

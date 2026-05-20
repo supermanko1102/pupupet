@@ -15,18 +15,12 @@ export function DailyBars({ days }: { days: DayMetric[] }) {
     ? Math.max(12, Math.floor((chartWidth - (days.length * barWidth) - 24) / Math.max(1, days.length - 1)))
     : 10;
   const chartData: stackDataItem[] = days.map((day) => {
-    const stacks = [
-      { color: Brand.primary, value: day.normalCount },
-      { color: '#f59e0b', value: day.observeCount },
-      { color: '#ef4444', value: day.vetCount },
-    ].filter((stack) => stack.value > 0);
-
     return {
       barBorderRadius: 5,
       label: isCompact ? day.weekday : `${day.dayNumber}`,
       labelTextStyle: day.isToday ? styles.labelToday : styles.label,
-      stacks: stacks.length > 0
-        ? stacks
+      stacks: day.count > 0
+        ? [{ color: day.hasWatchItems ? '#f59e0b' : Brand.primary, value: day.count }]
         : [{ color: '#d9e2e0', value: 0 }],
     };
   });
@@ -71,9 +65,8 @@ export function DailyBars({ days }: { days: DayMetric[] }) {
         />
       </View>
       <View style={styles.legend}>
-        <LegendItem color={Brand.primary} label="正常" />
-        <LegendItem color="#f59e0b" label="觀察" />
-        <LegendItem color="#ef4444" label="就醫" />
+        <LegendItem color={Brand.primary} label="紀錄" />
+        <LegendItem color="#f59e0b" label="有留意點" />
       </View>
     </Card>
   );

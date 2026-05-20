@@ -16,10 +16,15 @@ function makeDeps(overrides: Partial<AnalysisPollerDeps> = {}): AnalysisPollerDe
 }
 
 const baseLog: PolledAnalysisLog = {
+  ai_escalation_signs: ['若持續水便可聯絡獸醫'],
+  ai_findings: ['顏色棕色'],
+  ai_next_step: '接下來可以再觀察。',
+  ai_observation: '照片中看起來成形。',
+  ai_possible_reasons: [],
+  ai_watch_items: ['留意是否變稀'],
   bristol_score: 4,
   failure_reason: null,
   recommendation: '保持目前飲食。',
-  risk_level: 'normal',
   status: 'pending',
   summary: '狀況看起來正常。',
 };
@@ -57,7 +62,7 @@ describe('pollAnalysisOnce', () => {
 
   it('returns completed with the signed URL when the log finishes successfully', async () => {
     const fetchLogStatus = vi.fn().mockResolvedValue({
-      data: { ...baseLog, status: 'done', risk_level: 'observe' },
+      data: { ...baseLog, status: 'done' },
       error: null,
     });
     const createSignedUrl = vi.fn().mockResolvedValue('https://signed.example/poop.jpg');
@@ -69,7 +74,8 @@ describe('pollAnalysisOnce', () => {
     if (outcome.kind !== 'completed') return;
     expect(outcome.logId).toBe('log-1');
     expect(outcome.result.imageUrl).toBe('https://signed.example/poop.jpg');
-    expect(outcome.result.riskLevel).toBe('observe');
+    expect(outcome.result.aiObservation).toBe('照片中看起來成形。');
+    expect(outcome.result.aiWatchItems).toEqual(['留意是否變稀']);
     expect(outcome.result.failed).toBe(false);
     expect(createSignedUrl).toHaveBeenCalledWith('user-id/poop.jpg');
   });
@@ -98,7 +104,8 @@ describe('pollAnalysisOnce', () => {
     expect(outcome.kind).toBe('completed');
     if (outcome.kind !== 'completed') return;
     expect(outcome.result.failed).toBe(true);
-    expect(outcome.result.riskLevel).toBe(null);
+    expect(outcome.result.aiObservation).toBe(null);
+    expect(outcome.result.aiWatchItems).toEqual([]);
   });
 
   it('returns timeout once total elapsed exceeds timeoutMs', async () => {

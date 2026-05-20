@@ -5,28 +5,28 @@ import { Press } from '@/components/ui';
 import { selectionFeedback } from '@/lib/haptics';
 
 export function FilterRow({
-  abnormalOnly,
-  onToggleAbnormalOnly,
+  onToggleWatchOnly,
+  watchOnly,
 }: {
-  abnormalOnly: boolean;
-  onToggleAbnormalOnly: (value: boolean) => void;
+  onToggleWatchOnly: (value: boolean) => void;
+  watchOnly: boolean;
 }) {
   function handleFilterPress(nextValue: boolean) {
-    if (nextValue !== abnormalOnly) selectionFeedback();
-    onToggleAbnormalOnly(nextValue);
+    if (nextValue !== watchOnly) selectionFeedback();
+    onToggleWatchOnly(nextValue);
   }
 
   return (
     <View style={styles.row}>
       <Press
-        style={[styles.button, !abnormalOnly && styles.buttonSelected]}
+        style={[styles.button, !watchOnly && styles.buttonSelected]}
         onPress={() => handleFilterPress(false)}>
-        <Text style={[styles.text, !abnormalOnly && styles.textSelected]}>全部</Text>
+        <Text style={[styles.text, !watchOnly && styles.textSelected]}>全部</Text>
       </Press>
       <Press
-        style={[styles.button, abnormalOnly && styles.buttonSelected]}
+        style={[styles.button, watchOnly && styles.buttonSelected]}
         onPress={() => handleFilterPress(true)}>
-        <Text style={[styles.text, abnormalOnly && styles.textSelected]}>只看異常</Text>
+        <Text style={[styles.text, watchOnly && styles.textSelected]}>只看需留意</Text>
       </Press>
     </View>
   );

@@ -68,7 +68,7 @@ export default function NotificationsSettingsScreen() {
         )}
 
         <Text style={local.footnote}>
-          目前 PupuPet 只會在偵測到異常時，於隔天早上 9:00 提醒你追蹤。
+          目前 PupuPet 只會在你手動設定追蹤時，於隔天早上 9:00 提醒你再記錄一次。
         </Text>
       </ScrollView>
     </SafeAreaView>

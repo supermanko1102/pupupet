@@ -31,7 +31,10 @@ function navigateToFollowUp(logId: string) {
 
 function handleNotificationResponse(response: Notifications.NotificationResponse) {
   const data = response.notification.request.content.data;
-  if (data?.type === 'abnormal_follow_up' && typeof data.logId === 'string') {
+  if (
+    (data?.type === 'log_follow_up' || data?.type === 'abnormal_follow_up') &&
+    typeof data.logId === 'string'
+  ) {
     navigateToFollowUp(data.logId);
   }
 }
